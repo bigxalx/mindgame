@@ -126,119 +126,6 @@ export function GameBoard({ state, role, onMove, onSwap, isAiMode }: Props) {
 
     return (
         <div className="flex flex-col items-center space-y-8 w-full">
-            {/* Board Container */}
-            <div
-                className="relative bg-slate-900 p-2 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden"
-                style={{
-                    width: 'min(90vw, 400px)',
-                    height: 'min(90vw, 400px)',
-                }}
-            >
-                {/* Glow Effects Layer */}
-                <AnimatePresence>
-                    {hovering && state.board[hovering.r][hovering.c].type === 'empty' && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 pointer-events-none z-0"
-                            style={{
-                                background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(59, 130, 246, 0.15) 0%, transparent 20%)`
-                            }}
-                        />
-                    )}
-                    {/* Action Preview Glows */}
-                    {affectedCells.map((cell, idx) => (
-                        <motion.div
-                            key={`affected-${idx}`}
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 0.4, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            className={cn("absolute pointer-events-none rounded-full blur-xl z-0", effectColor || "bg-blue-400")}
-                            style={{
-                                width: `${100 / state.boardSize}%`,
-                                height: `${100 / state.boardSize}%`,
-                                left: `${(cell.c / state.boardSize) * 100}%`,
-                                top: `${(cell.r / state.boardSize) * 100}%`,
-                            }}
-                        />
-                    ))}
-                </AnimatePresence>
-
-                {/* The Grid */}
-                <div
-                    className="grid h-full"
-                    style={{
-                        gridTemplateColumns: `repeat(${state.boardSize}, 1fr)`,
-                        gridTemplateRows: `repeat(${state.boardSize}, 1fr)`,
-                    }}
-                >
-                    {state.board.map((row, r) =>
-                        row.map((cell, c) => (
-                            <div
-                                key={cell.id}
-                                className="relative border border-slate-800/50 flex items-center justify-center group touch-none"
-                                onClick={() => handleClick(r, c)}
-                                onMouseEnter={() => setHovering({ r, c })}
-                                onMouseLeave={() => setHovering(null)}
-                            >
-                                {/* Intersection lines for Go aesthetic */}
-                                <div className="absolute w-[1px] h-full bg-slate-800/30 z-0"></div>
-                                <div className="absolute h-[1px] w-full bg-slate-800/30 z-0"></div>
-
-                                {/* Stone */}
-                                <AnimatePresence mode="popLayout">
-                                    {cell.type !== 'empty' && (
-                                        <motion.div
-                                            layoutId={cell.id}
-                                            initial={{ scale: 0, opacity: 0 }}
-                                            animate={{ scale: 1, opacity: 1 }}
-                                            exit={{ scale: 0, opacity: 0 }}
-                                            className={cn(
-                                                "w-4/5 h-4/5 rounded-full z-10 shadow-lg relative transition-all duration-300 border",
-                                                cell.type === 'black' && "bg-black border-slate-700 shadow-black/80",
-                                                cell.type === 'white' && "bg-white border-slate-200 shadow-white/20",
-                                                cell.type === 'yellow' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/50",
-                                                swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900"
-                                            )}
-                                        >
-                                            {/* Effect markers - Centered */}
-                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                {cell.effects.includes('empathy') && (
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_green] border border-green-500/50" />
-                                                )}
-                                                {cell.effects.includes('control') && !cell.effects.includes('empathy') && (
-                                                    <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_blue] border border-blue-500/50" />
-                                                )}
-                                                {cell.effects.includes('action') && !cell.effects.includes('empathy') && !cell.effects.includes('control') && (
-                                                    <div className="text-[12px] font-black text-slate-400 tracking-tighter">X</div>
-                                                )}
-
-                                                {/* Multi-effect composite (Optional: if we want to show multiple dots, but current requirement is centering one) */}
-                                                {/* For now, prioritizing: Empathy > Control > Action for the primary center marker */}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-
-                                {/* Highlight valid swap targets */}
-                                {isSwapMode && !swapSelection && cell.type !== 'empty' && state.pendingSwap && Math.abs(r - state.pendingSwap.r) + Math.abs(c - state.pendingSwap.c) <= 1 && (
-                                    <div className="absolute inset-0 bg-amber-400/10 animate-pulse z-0" />
-                                )}
-
-                                {/* Preview on hover */}
-                                {hovering?.r === r && hovering?.c === c && cell.type === 'empty' && canMove && (
-                                    <div className={cn(
-                                        "w-3/4 h-3/4 rounded-full border-2 border-dashed opacity-40 animate-pulse",
-                                        state.turn === 'black' ? "border-slate-50" : "border-slate-400"
-                                    )} />
-                                )}
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-
             {/* Special Stones Selector */}
             <div className="w-full max-w-md space-y-3">
                 <div className="flex justify-between items-center mb-1 px-1">
@@ -285,6 +172,139 @@ export function GameBoard({ state, role, onMove, onSwap, isAiMode }: Props) {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Board Wrapper (Background Art) */}
+            <div
+                className="relative rounded-[2.5rem] shadow-2xl overflow-hidden group border border-slate-700/50"
+                style={{
+                    width: 'min(95vw, 700px)',
+                    height: 'min(95vw, 700px)',
+                    backgroundImage: 'url("/board.png")',
+                    backgroundSize: '100% 100%',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    padding: '10%',
+                }}
+            >
+                {/* Subtle overlay to help stone contrast */}
+                <div className="absolute inset-0 bg-slate-950/10 pointer-events-none z-0" />
+
+                {/* The Interactive Board (Centered Grid) */}
+                <div className="relative w-full h-full z-10">
+
+                    {/* Glow Effects Layer */}
+                    <AnimatePresence>
+                        {hovering && state.board[hovering.r][hovering.c].type === 'empty' && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 pointer-events-none z-0"
+                                style={{
+                                    background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(59, 130, 246, 0.15) 0%, transparent 20%)`
+                                }}
+                            />
+                        )}
+                        {/* Action Preview Glows */}
+                        {affectedCells.map((cell, idx) => (
+                            <motion.div
+                                key={`affected-${idx}`}
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 0.4, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.5 }}
+                                className={cn("absolute pointer-events-none rounded-full blur-xl z-0", effectColor || "bg-blue-400")}
+                                style={{
+                                    width: `${100 / state.boardSize}%`,
+                                    height: `${100 / state.boardSize}%`,
+                                    left: `${(cell.c / state.boardSize) * 100}%`,
+                                    top: `${(cell.r / state.boardSize) * 100}%`,
+                                }}
+                            />
+                        ))}
+                    </AnimatePresence>
+
+                    {/* The Grid */}
+                    <div
+                        className="grid h-full w-full shadow-2xl"
+                        style={{
+                            gridTemplateColumns: `repeat(${state.boardSize}, 1fr)`,
+                            gridTemplateRows: `repeat(${state.boardSize}, 1fr)`,
+                        }}
+                    >
+                        {state.board.map((row, r) =>
+                            row.map((cell, c) => (
+                                <div
+                                    key={cell.id}
+                                    className="relative flex items-center justify-center group touch-none"
+                                    onClick={() => handleClick(r, c)}
+                                    onMouseEnter={() => setHovering({ r, c })}
+                                    onMouseLeave={() => setHovering(null)}
+                                >
+                                    {/* Vertical Line */}
+                                    <div className={cn(
+                                        "absolute w-[2.5px] bg-slate-200/40 z-0",
+                                        r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full"
+                                    )}></div>
+                                    {/* Horizontal Line */}
+                                    <div className={cn(
+                                        "absolute h-[2.5px] bg-slate-200/40 z-0",
+                                        c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full"
+                                    )}></div>
+
+                                    {/* Stone */}
+                                    <AnimatePresence mode="popLayout">
+                                        {cell.type !== 'empty' && (
+                                            <motion.div
+                                                layoutId={cell.id}
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                exit={{ scale: 0, opacity: 0 }}
+                                                className={cn(
+                                                    "w-[70%] h-[70%] rounded-full z-10 shadow-lg relative transition-all duration-300 border",
+                                                    cell.type === 'black' && "bg-black border-slate-700 shadow-black/80",
+                                                    cell.type === 'white' && "bg-white border-slate-200 shadow-white/20",
+                                                    cell.type === 'yellow' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/50",
+                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900"
+                                                )}
+                                            >
+                                                {/* Effect markers - Centered */}
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    {cell.effects.includes('empathy') && (
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_green] border border-green-500/50" />
+                                                    )}
+                                                    {cell.effects.includes('control') && !cell.effects.includes('empathy') && (
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_blue] border border-blue-500/50" />
+                                                    )}
+                                                    {cell.effects.includes('action') && !cell.effects.includes('empathy') && !cell.effects.includes('control') && (
+                                                        <div className="text-[12px] font-black text-slate-400 tracking-tighter">X</div>
+                                                    )}
+
+                                                    {/* Multi-effect composite (Optional: if we want to show multiple dots, but current requirement is centering one) */}
+                                                    {/* For now, prioritizing: Empathy > Control > Action for the primary center marker */}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* Highlight valid swap targets */}
+                                    {isSwapMode && !swapSelection && cell.type !== 'empty' && state.pendingSwap && Math.abs(r - state.pendingSwap.r) + Math.abs(c - state.pendingSwap.c) <= 1 && (
+                                        <div className="absolute inset-0 bg-amber-400/10 animate-pulse z-0" />
+                                    )}
+
+                                    {/* Preview on hover */}
+                                    {hovering?.r === r && hovering?.c === c && cell.type === 'empty' && canMove && (
+                                        <div className={cn(
+                                            "w-[65%] h-[65%] rounded-full border-2 border-dashed opacity-40 animate-pulse",
+                                            state.turn === 'black' ? "border-slate-50" : "border-slate-400"
+                                        )} />
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+
 
             {/* Game Over Modal */}
             <AnimatePresence>

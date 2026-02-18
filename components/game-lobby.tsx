@@ -27,6 +27,9 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                 </div>
                 <CardTitle className="text-2xl font-bold tracking-tight">Mind Game</CardTitle>
                 <CardDescription className="text-slate-400">A tactical board game of spread and control</CardDescription>
+                <p className="text-[11px] text-center w-full text-slate-400 font-medium italic pt-1">
+                    Created by Big, who originally had this idea
+                </p>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -96,7 +99,7 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                 </div>
             </CardContent>
             <CardFooter>
-                <p className="text-[10px] text-center w-full text-slate-600 leading-tight">
+                <p className="text-[10px] text-center w-full text-slate-500 leading-tight">
                     Goal: As Black, capture all yellow stones. White defends. One stone turns yellow each turn.
                 </p>
             </CardFooter>
