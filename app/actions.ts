@@ -74,7 +74,6 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         newBoard = triggerAction(newBoard, { r, c });
     }
 
-    newBoard = spreadEmpathy(newBoard);
     newBoard = checkCaptures(newBoard, player);
 
     const isOpportunity = effect === 'opportunity' && newBoard[r][c].effects.includes('opportunity');
@@ -159,7 +158,10 @@ export async function commitTurn(gameId: string) {
         }
     }
 
-    // START OF TURN LOGIC: If it's now White's turn, spread yellow IMMEDIATELY
+    // START OF TURN LOGIC
+    // Spread empathy for the player whose turn it just became
+    newBoard = spreadEmpathy(newBoard, nextPlayer);
+
     if (nextPlayer === 'white') {
         const result = spreadYellow(newBoard);
         newBoard = result.board;

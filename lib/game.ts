@@ -75,14 +75,20 @@ export const spreadYellow = (board: Board): { board: Board; changed: boolean } =
 };
 
 // Spread Empathy: Spreads like a virus
-export const spreadEmpathy = (board: Board): Board => {
+// Spread Empathy: Spreads like a virus, but only from the active player's stones
+export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     const size = board.length;
     const newBoard = JSON.parse(JSON.stringify(board)) as Board;
     const toAdd: { r: number; c: number }[] = [];
 
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
-            if (board[r][c].effects.includes('empathy')) {
+            const cell = board[r][c];
+            const isPlayerStone = activePlayer === 'black'
+                ? cell.type === 'black'
+                : (cell.type === 'white' || cell.type === 'yellow');
+
+            if (isPlayerStone && cell.effects.includes('empathy')) {
                 const neighbors = getNeighbors(r, c, size);
                 for (const n of neighbors) {
                     if (board[n.r][n.c].type !== 'empty' && !board[n.r][n.c].effects.includes('empathy')) {
@@ -351,9 +357,11 @@ const minimax = (
             nextBoard[move.r][move.c].id = `sim-${move.r}-${move.c}-${depth}`;
             nextBoard[move.r][move.c].type = 'white';
             nextBoard = checkCaptures(nextBoard, 'white');
-            const { board: spreadBoard } = spreadYellow(nextBoard);
 
-            const evalScore = minimax(spreadBoard, depth - 1, alpha, beta, false, size);
+            // Start of Black's turn:
+            let nextTurnBoard = spreadEmpathy(nextBoard, 'black');
+
+            const evalScore = minimax(nextTurnBoard, depth - 1, alpha, beta, false, size);
             maxEval = Math.max(maxEval, evalScore);
             alpha = Math.max(alpha, evalScore);
             if (beta <= alpha) break;
@@ -367,7 +375,11 @@ const minimax = (
             nextBoard[move.r][move.c].type = 'black';
             nextBoard = checkCaptures(nextBoard, 'black');
 
-            const evalScore = minimax(nextBoard, depth - 1, alpha, beta, true, size);
+            // Start of White's turn:
+            let nextTurnBoard = spreadEmpathy(nextBoard, 'white');
+            const { board: yellowBoard } = spreadYellow(nextTurnBoard);
+
+            const evalScore = minimax(yellowBoard, depth - 1, alpha, beta, true, size);
             minEval = Math.min(minEval, evalScore);
             beta = Math.min(beta, evalScore);
             if (beta <= alpha) break;
@@ -427,11 +439,14 @@ export const getAIDecision = (
             }
 
             if (effect === 'action') simulatedBoard = triggerAction(simulatedBoard, move);
-            simulatedBoard = spreadEmpathy(simulatedBoard);
             simulatedBoard = checkCaptures(simulatedBoard, turn);
-            if (turn === 'white') {
-                const spread = spreadYellow(simulatedBoard);
-                simulatedBoard = spread.board;
+
+            // Simulating turn transition to opponent
+            const opponent = turn === 'black' ? 'white' : 'black';
+            simulatedBoard = spreadEmpathy(simulatedBoard, opponent);
+            if (opponent === 'white') {
+                const spreadRes = spreadYellow(simulatedBoard);
+                simulatedBoard = spreadRes.board;
             }
 
             const score = minimax(simulatedBoard, depth - 1, -Infinity, Infinity, false, size);
