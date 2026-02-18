@@ -111,9 +111,14 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center justify-start p-4 md:p-8 space-y-6">
       <div className="w-full max-w-md flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tighter bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-          MIND GAME
-        </h1>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-800 shadow-lg">
+            <img src="/icon.png" alt="Logo" className="w-full h-full object-cover" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tighter bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+            MIND GAME
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

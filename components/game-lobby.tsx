@@ -22,8 +22,8 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
     return (
         <Card className="w-full max-w-sm bg-slate-900 border-slate-800 text-slate-50 shadow-2xl shadow-blue-900/10">
             <CardHeader className="text-center">
-                <div className="mx-auto w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center mb-4 border border-blue-500/30">
-                    <Brain className="w-6 h-6 text-blue-400" />
+                <div className="mx-auto w-24 h-24 rounded-2xl overflow-hidden mb-4 border-2 border-slate-800 shadow-xl">
+                    <img src="/icon.png" alt="Mind Game" className="w-full h-full object-cover" />
                 </div>
                 <CardTitle className="text-2xl font-bold tracking-tight">Mind Game</CardTitle>
                 <CardDescription className="text-slate-400">A tactical board game of spread and control</CardDescription>
