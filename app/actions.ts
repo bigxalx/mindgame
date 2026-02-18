@@ -1,10 +1,10 @@
 "use server";
 
 import { createGame, getGame, saveGame } from "@/lib/storage";
-import { GameState, Player, Board, SpecialEffect } from "@/types/game";
+import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
 import { createInitialBoard, checkCaptures, triggerAction, spreadYellow, spreadEmpathy, getNeighbors } from "@/lib/game";
 
-export async function hostGame(nickname: string, size: number = 5) {
+export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const initialInventory = {
         action: 2,
@@ -23,7 +23,9 @@ export async function hostGame(nickname: string, size: number = 5) {
         inventory: {
             black: { ...initialInventory },
             white: { ...initialInventory }
-        }
+        },
+        isAiGame,
+        difficulty
     };
 
     await createGame(gameId, initialState);

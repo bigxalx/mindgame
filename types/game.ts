@@ -1,5 +1,6 @@
 export type StoneType = 'black' | 'white' | 'yellow' | 'empty';
 export type SpecialEffect = 'empathy' | 'control' | 'action' | 'opportunity';
+export type AIDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'impossible';
 
 export interface Cell {
     type: StoneType;
@@ -23,6 +24,8 @@ export interface GameState {
     inventory: Record<Player, Inventory>;
     pendingSwap?: { r: number; c: number }; // For Opportunity stone
     moveConfirmed: boolean; // Has the player placed their main stone?
+    difficulty?: AIDifficulty;
+    isAiGame?: boolean;
     lastAction?: {
         type: 'move' | 'swap' | 'capture' | 'spread';
         cells: { r: number; c: number }[];

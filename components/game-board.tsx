@@ -5,7 +5,7 @@ import { GameState, Player, SpecialEffect, Cell } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Zap, Heart, Target, Loader2 } from "lucide-react";
-import { basicAI } from "@/lib/game";
+import { getAIDecision, getNeighbors } from "@/lib/game";
 import { toast } from "sonner"; // Assuming toast is from sonner or similar library
 
 interface Props {
@@ -13,10 +13,11 @@ interface Props {
     role: Player | 'spectator' | null;
     onMove: (r: number, c: number, effect: SpecialEffect | null) => void;
     onSwap: (r1: number, c1: number, r2: number, c2: number) => void;
+    onEndTurn: () => void;
     isAiMode: boolean;
 }
 
-export function GameBoard({ state, role, onMove, onSwap, isAiMode }: Props) {
+export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: Props) {
     const [selectedEffect, setSelectedEffect] = useState<SpecialEffect | null>(null);
     const [hovering, setHovering] = useState<{ r: number; c: number } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -59,22 +60,62 @@ export function GameBoard({ state, role, onMove, onSwap, isAiMode }: Props) {
         setIsProcessing(false);
     };
 
-    // AI Turn (Disabled for now as per request)
-    /*
+    // AI Turn Lifecycle
     useEffect(() => {
-        if (isAiMode && state.turn === 'white' && !state.gameOver && !isProcessing) {
-            const timer = setTimeout(async () => {
-                setIsProcessing(true);
-                const aiMove = basicAI(state.board, 'white');
-                if (aiMove) {
-                    await onMove(aiMove.r, aiMove.c, aiMove.effect || null);
+        // AI ACTS IF: It's an AI game AND it is White's turn AND game isn't over AND not already processing
+        const needsToAct = (isAiMode || state.isAiGame) && state.turn === 'white';
+
+        if (!needsToAct || state.gameOver || isProcessing) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                // Phase 1: Place a stone
+                if (!state.moveConfirmed) {
+                    setIsProcessing(true);
+                    console.log("AI Phase 1: Planning move...");
+                    await new Promise(r => setTimeout(r, 800)); // Decision delay
+
+                    const aiDecision = getAIDecision(state, state.difficulty || 'medium');
+                    if (aiDecision) {
+                        console.log("AI Phase 1: Placing stone at", aiDecision);
+                        await onMove(aiDecision.r, aiDecision.c, aiDecision.effect);
+                    } else {
+                        console.log("AI Phase 1: No valid moves, ending turn.");
+                        onEndTurn();
+                    }
+                    setIsProcessing(false);
+                    return;
                 }
+
+                // Phase 2: Handle pending swap (Opportunity)
+                if (state.pendingSwap) {
+                    setIsProcessing(true);
+                    console.log("AI Phase 2: Handling swap at", state.pendingSwap);
+                    await new Promise(r => setTimeout(r, 600)); // Swap delay
+                    const { r, c } = state.pendingSwap;
+                    const neighbors = getNeighbors(r, c, state.boardSize);
+                    const target = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    await onSwap(r, c, target.r, target.c);
+                    setIsProcessing(false);
+                    return;
+                }
+
+                // Phase 3: Commit Turn
+                if (state.moveConfirmed && !state.pendingSwap) {
+                    setIsProcessing(true);
+                    console.log("AI Phase 3: Committing turn...");
+                    await new Promise(r => setTimeout(r, 500)); // Finish delay
+                    onEndTurn();
+                    setIsProcessing(false);
+                }
+            } catch (error) {
+                console.error("AI Turn Lifecycle Error:", error);
                 setIsProcessing(false);
-            }, 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [state.turn, isAiMode, state.gameOver, isProcessing]);
-    */
+            }
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [state.turn, isAiMode, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap]);
 
     const effectsList: { id: SpecialEffect; icon: any; color: string; label: string; desc: string }[] = [
         { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Spreads green virus. Blocks yellowing.' },
@@ -260,10 +301,10 @@ export function GameBoard({ state, role, onMove, onSwap, isAiMode }: Props) {
                                                 animate={{ scale: 1, opacity: 1 }}
                                                 exit={{ scale: 0, opacity: 0 }}
                                                 className={cn(
-                                                    "w-[70%] h-[70%] rounded-full z-10 shadow-lg relative transition-all duration-300 border",
+                                                    "w-[68%] h-[68%] rounded-full z-10 shadow-lg relative transition-all duration-300 border",
                                                     cell.type === 'black' && "bg-black border-slate-700 shadow-black/80",
                                                     cell.type === 'white' && "bg-white border-slate-200 shadow-white/20",
-                                                    cell.type === 'yellow' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/50",
+                                                    cell.type === 'yellow' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/20",
                                                     swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900"
                                                 )}
                                             >

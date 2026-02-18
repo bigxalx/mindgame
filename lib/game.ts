@@ -1,4 +1,4 @@
-import { Board, Cell, Player, SpecialEffect, StoneType } from "@/types/game";
+import { Board, Cell, Player, SpecialEffect, StoneType, GameState, AIDifficulty } from "@/types/game";
 
 export const createInitialBoard = (size: number): Board => {
     const board: Board = [];
@@ -218,27 +218,242 @@ export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
     return newBoard;
 };
 
-export const basicAI = (board: Board, player: Player): { r: number; c: number; effect?: SpecialEffect } | null => {
-    const size = board.length;
-    const validMoves: { r: number; c: number }[] = [];
+// --- Advanced AI System ---
+
+/**
+ * Heuristic Evaluation: Calculates the "value" of a board state from White's perspective.
+ */
+const evaluateBoardDeep = (board: Board, size: number): number => {
+    let score = 0;
+    const visited = new Set<string>();
+
+    // Helper: Find group and its liberties
+    const getGroupInfo = (r: number, c: number, type: 'black' | 'white-yellow') => {
+        const group: { r: number; c: number }[] = [];
+        const queue: { r: number; c: number }[] = [{ r, c }];
+        const liberties = new Set<string>();
+        const localVisited = new Set<string>();
+        const stoneType = board[r][c].type;
+        const isWhiteYellow = (t: StoneType) => t === 'white' || t === 'yellow';
+
+        localVisited.add(`${r}-${c}`);
+
+        while (queue.length > 0) {
+            const curr = queue.shift()!;
+            group.push(curr);
+
+            const neighbors = getNeighbors(curr.r, curr.c, size);
+            for (const n of neighbors) {
+                const nType = board[n.r][n.c].type;
+                if (nType === 'empty') {
+                    liberties.add(`${n.r}-${n.c}`);
+                } else {
+                    const match = type === 'white-yellow' ? isWhiteYellow(nType) : nType === 'black';
+                    if (match && !localVisited.has(`${n.r}-${n.c}`)) {
+                        localVisited.add(`${n.r}-${n.c}`);
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+        return { group, libertyCount: liberties.size };
+    };
 
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
-            if (board[r][c].type === 'empty') {
-                validMoves.push({ r, c });
+            const cell = board[r][c];
+            if (cell.type === 'empty' || visited.has(`${r}-${c}`)) continue;
+
+            const isWY = cell.type === 'white' || cell.type === 'yellow';
+            const groupInfo = getGroupInfo(r, c, isWY ? 'white-yellow' : 'black');
+            groupInfo.group.forEach(p => visited.add(`${p.r}-${p.c}`));
+
+            // Score based on group size and vitality (liberties)
+            const count = groupInfo.group.length;
+            const libs = groupInfo.libertyCount;
+
+            if (isWY) {
+                // White/Yellow scoring
+                score += count * 15; // Raw presence
+                if (libs === 1) score -= 150; // Danger! (Atari)
+                else if (libs === 2) score += 40;
+                else if (libs >= 3) score += 100;
+
+                // Special bonus for yellow stones specifically
+                const yellowCount = groupInfo.group.filter(p => board[p.r][p.c].type === 'yellow').length;
+                score += yellowCount * 120;
+
+                // Empathy protection bonus
+                const groupHasEmpathy = groupInfo.group.some(p => board[p.r][p.c].effects.includes('empathy'));
+                if (groupHasEmpathy) score += 60;
+            } else {
+                // Black scoring (negative for white)
+                score -= count * 25;
+                if (libs === 0) score += 400; // GREAT! Captured black stones
+                if (libs === 1) score += 120; // Black is in danger
+                if (libs >= 3) score -= 60;   // Black is strong
             }
+        }
+    }
+
+    // Positional/Strategic bonuses
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const cell = board[r][c];
+            if (cell.type === 'empty') {
+                const distToCenter = Math.abs(r - size / 2) + Math.abs(c - size / 2);
+                score -= distToCenter * 3;
+            }
+            if (cell.effects.includes('control')) score += 20;
+        }
+    }
+
+    return score;
+};
+
+/**
+ * Minimax algorithm with Alpha-Beta pruning
+ */
+const minimax = (
+    board: Board,
+    depth: number,
+    alpha: number,
+    beta: number,
+    isMaximizing: boolean,
+    size: number
+): number => {
+    if (depth === 0) return evaluateBoardDeep(board, size);
+
+    const validMoves: { r: number; c: number }[] = [];
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (board[r][c].type === 'empty') validMoves.push({ r, c });
+        }
+    }
+
+    if (validMoves.length === 0) return evaluateBoardDeep(board, size);
+
+    // Score and sort moves to improve pruning efficiency
+    const scoredMoves = validMoves.map(m => {
+        let score = 0;
+        const neighbors = getNeighbors(m.r, m.c, size);
+        neighbors.forEach(n => {
+            if (board[n.r][n.c].type === 'black') score += 10;
+            if (board[n.r][n.c].type === 'yellow') score += 20;
+        });
+        return { ...m, quickScore: score };
+    }).sort((a, b) => b.quickScore - a.quickScore);
+
+    if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (const move of scoredMoves) {
+            let nextBoard = JSON.parse(JSON.stringify(board)) as Board;
+            nextBoard[move.r][move.c].id = `sim-${move.r}-${move.c}-${depth}`;
+            nextBoard[move.r][move.c].type = 'white';
+            nextBoard = checkCaptures(nextBoard, 'white');
+            const { board: spreadBoard } = spreadYellow(nextBoard);
+
+            const evalScore = minimax(spreadBoard, depth - 1, alpha, beta, false, size);
+            maxEval = Math.max(maxEval, evalScore);
+            alpha = Math.max(alpha, evalScore);
+            if (beta <= alpha) break;
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (const move of scoredMoves) {
+            let nextBoard = JSON.parse(JSON.stringify(board)) as Board;
+            nextBoard[move.r][move.c].id = `sim-${move.r}-${move.c}-${depth}`;
+            nextBoard[move.r][move.c].type = 'black';
+            nextBoard = checkCaptures(nextBoard, 'black');
+
+            const evalScore = minimax(nextBoard, depth - 1, alpha, beta, true, size);
+            minEval = Math.min(minEval, evalScore);
+            beta = Math.min(beta, evalScore);
+            if (beta <= alpha) break;
+        }
+        return minEval;
+    }
+};
+
+export const getAIDecision = (
+    state: GameState,
+    difficulty: AIDifficulty
+): { r: number; c: number; effect: SpecialEffect | null } | null => {
+    const { board, turn, inventory, boardSize } = state;
+    const size = boardSize;
+    const myInventory = inventory[turn];
+
+    const validMoves: { r: number; c: number }[] = [];
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (board[r][c].type === 'empty') validMoves.push({ r, c });
         }
     }
 
     if (validMoves.length === 0) return null;
 
-    // Simple heuristic: Try to block black or spread near yellow
-    // For now, random move is "very basic" as requested
-    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+    // Depth settings
+    let depth = 1;
+    if (difficulty === 'hard') depth = 2;
+    if (difficulty === 'expert') depth = 3;
+    if (difficulty === 'impossible') depth = 4;
 
-    // Randomly add a special effect to make it more interesting for white
-    const effects: SpecialEffect[] = ['action', 'control', 'empathy', 'opportunity'];
-    const effect = Math.random() > 0.7 ? effects[Math.floor(Math.random() * effects.length)] : undefined;
+    // Adaptive depth based on complexity to avoid hang
+    if (size >= 6 && depth > 2) depth = 2;
+    if (validMoves.length > 20 && depth > 2) depth = 2;
 
-    return { ...randomMove, effect };
+    const moveEvaluations = validMoves.map(move => {
+        let bestEffectScore = -Infinity;
+        let bestEffect: SpecialEffect | null = null;
+
+        const possibleEffects: (SpecialEffect | null)[] = [null];
+        (Object.keys(myInventory) as SpecialEffect[]).forEach(e => {
+            if (myInventory[e] > 0) possibleEffects.push(e);
+        });
+
+        for (const effect of possibleEffects) {
+            let simulatedBoard = JSON.parse(JSON.stringify(board)) as Board;
+            simulatedBoard[move.r][move.c].type = turn;
+            if (effect) {
+                simulatedBoard[move.r][move.c].effects.push(effect);
+                if (effect === 'control') {
+                    getNeighbors(move.r, move.c, size).forEach(n => {
+                        if (!simulatedBoard[n.r][n.c].effects.includes('control')) {
+                            simulatedBoard[n.r][n.c].effects.push('control');
+                        }
+                    });
+                }
+            }
+
+            if (effect === 'action') simulatedBoard = triggerAction(simulatedBoard, move);
+            simulatedBoard = spreadEmpathy(simulatedBoard);
+            simulatedBoard = checkCaptures(simulatedBoard, turn);
+            if (turn === 'white') {
+                const spread = spreadYellow(simulatedBoard);
+                simulatedBoard = spread.board;
+            }
+
+            const score = minimax(simulatedBoard, depth - 1, -Infinity, Infinity, false, size);
+
+            if (score > bestEffectScore) {
+                bestEffectScore = score;
+                bestEffect = effect;
+            }
+        }
+
+        return { ...move, effect: bestEffect, score: bestEffectScore };
+    });
+
+    moveEvaluations.sort((a, b) => b.score - a.score);
+
+    if (difficulty === 'easy') {
+        return moveEvaluations[Math.floor(Math.random() * moveEvaluations.length)];
+    }
+    if (difficulty === 'medium') {
+        const top = moveEvaluations.slice(0, 3);
+        return top[Math.floor(Math.random() * top.length)];
+    }
+
+    return moveEvaluations[0];
 };

@@ -8,16 +8,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Brain, Users, Bot } from "lucide-react";
 
+import { AIDifficulty } from "@/types/game";
+
 interface Props {
     onHost: (name: string, size: number) => void;
     onJoin: (name: string, id: string) => void;
-    onAiPlay: (size: number) => void;
+    onAiPlay: (size: number, difficulty: AIDifficulty) => void;
 }
 
 export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
     const [nickname, setNickname] = useState("");
     const [gameId, setGameId] = useState("");
     const [size, setSize] = useState("5");
+    const [difficulty, setDifficulty] = useState<AIDifficulty>("medium");
 
     return (
         <Card className="w-full max-w-sm bg-slate-900 border-slate-800 text-slate-50 shadow-2xl shadow-blue-900/10">
@@ -57,20 +60,40 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                     </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="pt-2">
                     <Button
-                        className="w-full bg-blue-600 hover:bg-blue-500"
+                        className="w-full bg-blue-600 hover:bg-blue-500 h-10 shadow-lg shadow-blue-900/20 font-bold"
                         onClick={() => onHost(nickname || "Host", parseInt(size))}
                     >
-                        <Users className="w-4 h-4 mr-2" /> Host
+                        <Users className="w-4 h-4 mr-2" /> Host Multiplayer Game
                     </Button>
-                    <Button
-                        variant="outline"
-                        className="w-full border-slate-700 hover:bg-slate-800"
-                        onClick={() => onAiPlay(parseInt(size))}
-                    >
-                        <Bot className="w-4 h-4 mr-2" /> Vs AI
-                    </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div className="space-y-2">
+                        <Label className="text-[10px] uppercase tracking-wider text-slate-500">Difficulty</Label>
+                        <Select value={difficulty} onValueChange={(v: AIDifficulty) => setDifficulty(v)}>
+                            <SelectTrigger className="bg-slate-950 border-slate-800 h-10 text-xs">
+                                <SelectValue placeholder="AI Level" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800">
+                                <SelectItem value="easy">Easy</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="hard">Hard</SelectItem>
+                                <SelectItem value="expert">Expert</SelectItem>
+                                <SelectItem value="impossible">Impossible</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2 flex flex-col justify-end">
+                        <Button
+                            variant="outline"
+                            className="w-full border-slate-700 hover:bg-slate-800 h-10"
+                            onClick={() => onAiPlay(parseInt(size), difficulty)}
+                        >
+                            <Bot className="w-4 h-4 mr-2" /> Vs AI
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="relative py-2">
