@@ -1,65 +1,195 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { GameBoard } from "@/components/game-board";
+import { GameLobby } from "@/components/game-lobby";
+import { GameState, Player, SpecialEffect } from "@/types/game";
+import { hostGame, joinGame, pollGame, makeMove, swapMove, undoAction, commitTurn } from "@/app/actions";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { RotateCcw, CheckCircle2 } from "lucide-react";
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+  const [nickname, setNickname] = useState("");
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [state, setState] = useState<GameState | null>(null);
+  const [role, setRole] = useState<Player | 'spectator' | null>(null);
+  const [isAiMode, setIsAiMode] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  // Check for gameId in URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('game');
+    if (id && !gameId) {
+      handleJoin("Player", id);
+    }
+  }, []);
+
+  // Poll for updates if in multiplayer
+  useEffect(() => {
+    if (!gameId || isAiMode) return;
+
+    const interval = setInterval(async () => {
+      const updated = await pollGame(gameId);
+      if (updated) {
+        setState(updated);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [gameId, isAiMode]);
+
+  const handleHost = async (name: string, size: number) => {
+    try {
+      const res = await hostGame(name, size);
+      setGameId(res.gameId);
+      setState(res.state);
+      setNickname(name);
+      setRole('black');
+      toast.success(`Game created! ID: ${res.gameId}`);
+    } catch (e) {
+      toast.error("Failed to host game");
+    }
+  };
+
+  const handleJoin = async (name: string, id: string) => {
+    try {
+      const res = await joinGame(id, name);
+      setGameId(res.gameId);
+      setState(res.state);
+      setNickname(name);
+      setRole('white'); // Second person joins as white
+      toast.success("Joined game!");
+    } catch (e) {
+      toast.error("Game not found");
+    }
+  };
+
+  const handleAiPlay = async (size: number) => {
+    const res = await hostGame("You", size);
+    setGameId(res.gameId);
+    setState(res.state);
+    setNickname("You");
+    setRole('black');
+    setIsAiMode(true);
+    toast.info("Playing against AI");
+  };
+
+  const handleUndo = async () => {
+    if (!gameId) return;
+    setIsPending(true);
+    const newState = await undoAction(gameId);
+    if (newState) setState(newState);
+    setIsPending(false);
+  };
+
+  const handleEndTurn = async () => {
+    if (!gameId) return;
+    setIsPending(true);
+    const newState = await commitTurn(gameId);
+    if (newState) {
+      setState(newState);
+      toast.success("Turn ended");
+    }
+    setIsPending(false);
+  };
+
+  if (!state) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center p-4">
+        <GameLobby onHost={handleHost} onJoin={handleJoin} onAiPlay={handleAiPlay} />
       </main>
-    </div>
+    );
+  }
+
+  const isMyTurn = state.turn === role;
+  const canUndo = isMyTurn && state.history.length > 0 && !isPending;
+  const canEndTurn = isMyTurn && state.moveConfirmed && !isPending && state.pendingSwap === undefined;
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center justify-start p-4 md:p-8 space-y-6">
+      <div className="w-full max-w-md flex justify-between items-center">
+        <h1 className="text-2xl font-bold tracking-tighter bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+          MIND GAME
+        </h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-[10px] h-7 border-slate-700"
+            onClick={() => {
+              const url = `${window.location.origin}?game=${gameId}`;
+              navigator.clipboard.writeText(url);
+              toast.success("Game link copied!");
+            }}
+          >
+            Share
+          </Button>
+          <span className="text-xs text-slate-400 font-mono bg-slate-900 px-2 py-1 rounded border border-slate-800">{gameId}</span>
+          <Button variant="ghost" size="sm" onClick={() => {
+            window.history.pushState({}, '', window.location.pathname);
+            setGameId(null);
+            setState(null);
+          }}>
+            Exit
+          </Button>
+        </div>
+      </div>
+
+      <GameBoard
+        state={state}
+        role={role}
+        onMove={async (r: number, c: number, effect: SpecialEffect | null) => {
+          if (!gameId) return;
+          const newState = await makeMove(gameId, r, c, effect);
+          if (newState) setState(newState);
+        }}
+        onSwap={async (r1: number, c1: number, r2: number, c2: number) => {
+          if (!gameId) return;
+          const newState = await swapMove(gameId, r1, c1, r2, c2);
+          if (newState) setState(newState);
+        }}
+        isAiMode={isAiMode}
+      />
+
+      <div className="w-full max-w-md space-y-4">
+        {isMyTurn && (
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="border-slate-800 bg-slate-900/50 hover:bg-slate-800"
+              disabled={!canUndo}
+              onClick={handleUndo}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" /> Undo
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
+              disabled={!canEndTurn}
+              onClick={handleEndTurn}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" /> End Turn
+            </Button>
+          </div>
+        )}
+
+        <Card className="p-4 bg-slate-900/50 border-slate-800 backdrop-blur-md">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Current Turn</p>
+              <p className={`text-lg font-bold ${state.turn === 'black' ? 'text-slate-100' : 'text-slate-400'}`}>
+                {state.turn === 'black' ? 'BLACK' : 'WHITE'}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Goal</p>
+              <p className="text-sm">Capture all <span className="text-yellow-400 font-bold">Yellow</span> stones</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </main>
   );
 }

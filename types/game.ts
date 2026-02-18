@@ -1,0 +1,30 @@
+export type StoneType = 'black' | 'white' | 'yellow' | 'empty';
+export type SpecialEffect = 'empathy' | 'control' | 'action' | 'opportunity';
+
+export interface Cell {
+    type: StoneType;
+    effects: SpecialEffect[];
+    id: string; // unique ID for transitions
+}
+
+export type Board = Cell[][];
+
+export type Player = 'black' | 'white';
+
+export type Inventory = Record<SpecialEffect, number>;
+
+export interface GameState {
+    board: Board;
+    turn: Player;
+    history: GameState[]; // Full state history for undos within a turn
+    gameOver: boolean;
+    winner: Player | null;
+    boardSize: number;
+    inventory: Record<Player, Inventory>;
+    pendingSwap?: { r: number; c: number }; // For Opportunity stone
+    moveConfirmed: boolean; // Has the player placed their main stone?
+    lastAction?: {
+        type: 'move' | 'swap' | 'capture' | 'spread';
+        cells: { r: number; c: number }[];
+    };
+}
