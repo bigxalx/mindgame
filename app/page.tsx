@@ -156,22 +156,33 @@ export default function Home() {
 
       <div className="w-full max-w-md space-y-4">
         {isMyTurn && (
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              className="border-slate-800 bg-slate-900/50 hover:bg-slate-800"
-              disabled={!canUndo}
-              onClick={handleUndo}
-            >
-              <RotateCcw className="w-4 h-4 mr-2" /> Undo
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
-              disabled={!canEndTurn}
-              onClick={handleEndTurn}
-            >
-              <CheckCircle2 className="w-4 h-4 mr-2" /> End Turn
-            </Button>
+          <div className="space-y-4">
+            <div className="bg-blue-600/10 border border-blue-500/20 p-3 rounded-xl text-center">
+              <p className="text-sm font-medium text-blue-300">
+                {!state.moveConfirmed
+                  ? "Place your stone"
+                  : state.pendingSwap
+                    ? "⚡ Opportunity! Select stones to swap"
+                    : "Review your move or End Turn"}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                className="border-slate-800 bg-slate-900/50 hover:bg-slate-800 h-12"
+                disabled={!canUndo}
+                onClick={handleUndo}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" /> Undo
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20 h-12"
+                disabled={!canEndTurn}
+                onClick={handleEndTurn}
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" /> End Turn
+              </Button>
+            </div>
           </div>
         )}
 

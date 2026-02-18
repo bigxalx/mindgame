@@ -1,30 +1,38 @@
+import { kv } from "@vercel/kv";
 import { GameState } from "@/types/game";
 
-// This is a more robust In-Memory store that survives HMR (Hot Module Replacement)
-// during local development. 
-// ON VERCEL: It will work for as long as the serverless function remains warm.
-// If the function spins down, the game will be lost. This is normal for a prototype.
+// This is a dual-mode storage:
+// 1. LOCALHOST: Uses a global Map (persistent during HMR).
+// 2. VERCEL: Uses Vercel KV if KV_URL is present. 
+// Just click 'Storage' -> 'KV' in your Vercel dashboard to enable.
 
 declare global {
     var gameStore: Map<string, GameState> | undefined;
 }
 
-const games = global.gameStore || new Map<string, GameState>();
-
+const localGames = global.gameStore || new Map<string, GameState>();
 if (process.env.NODE_ENV !== 'production') {
-    global.gameStore = games;
+    global.gameStore = localGames;
 }
 
+const isKvEnabled = !!(process.env.KV_URL || process.env.UPSTASH_REDIS_REST_URL);
+
 export async function saveGame(gameId: string, state: GameState) {
-    games.set(gameId, state);
+    if (isKvEnabled) {
+        await kv.set(`game:${gameId}`, state, { ex: 3600 * 24 }); // 24h expiration
+    } else {
+        localGames.set(gameId, state);
+    }
     return state;
 }
 
 export async function getGame(gameId: string): Promise<GameState | null> {
-    return games.get(gameId) || null;
+    if (isKvEnabled) {
+        return await kv.get<GameState>(`game:${gameId}`);
+    }
+    return localGames.get(gameId) || null;
 }
 
 export async function createGame(gameId: string, state: GameState) {
-    games.set(gameId, state);
-    return gameId;
+    return await saveGame(gameId, state);
 }
