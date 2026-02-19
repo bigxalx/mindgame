@@ -39,6 +39,45 @@ export const getNeighbors = (r: number, c: number, size: number) => {
     return neighbors;
 };
 
+/**
+ * Checks if a cell is neutralized by an adjacent active Control stone.
+ * "Two opposing Control stones neutralize each other."
+ */
+export const isNeutralized = (board: Board, r: number, c: number): boolean => {
+    const size = board.length;
+    const cell = board[r][c];
+    if (cell.type === 'empty') return false;
+
+    const neighbors = getNeighbors(r, c, size);
+
+    // Check for any adjacent Control stones
+    const controlNeighbors = neighbors.filter(n => board[n.r][n.c].effects.includes('control'));
+
+    if (controlNeighbors.length === 0) return false;
+
+    // A Control stone is active if it is NOT adjacent to an opposing Control stone
+    // (excluding the current stone if it's a Control stone itself)
+    for (const cn of controlNeighbors) {
+        const cnType = board[cn.r][cn.c].type;
+        const cnOpponent = cnType === 'black' ? 'white' : 'black';
+
+        const cnNeighbors = getNeighbors(cn.r, cn.c, size);
+        const hasOpposingControl = cnNeighbors.some(cnn => {
+            // Must be an opposing team stone with Control
+            const isOpponent = board[cnn.r][cnn.c].type === cnOpponent ||
+                (cnOpponent === 'white' && board[cnn.r][cnn.c].type === 'resistance');
+            return isOpponent && board[cnn.r][cnn.c].effects.includes('control');
+        });
+
+        if (!hasOpposingControl) {
+            // This neighbor is an ACTIVE control stone
+            return true;
+        }
+    }
+
+    return false;
+};
+
 // Spread resistance: One white stone turns resistance if adjacent to resistance
 export const spreadResistance = (board: Board): { board: Board; changed: boolean } => {
     const size = board.length;
@@ -47,17 +86,17 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (board[r][c].type === 'white') {
+                // Cannot grow if neutralized
+                if (isNeutralized(board, r, c)) continue;
+
                 // Check if adjacent to resistance
                 const neighbors = getNeighbors(r, c, size);
                 const isAdjToResistance = neighbors.some(n => board[n.r][n.c].type === 'resistance');
 
-                // Cannot turn resistance if has empathy
+                // Cannot turn resistance if has empathy (standard check, though neutralized covers it)
                 const hasEmpathy = board[r][c].effects.includes('empathy');
 
-                // Check for control stones nearby that stop spread
-                const isBlockedByControl = neighbors.some(n => board[n.r][n.c].effects.includes('control'));
-
-                if (isAdjToResistance && !hasEmpathy && !isBlockedByControl) {
+                if (isAdjToResistance && !hasEmpathy) {
                     candidates.push({ r, c });
                 }
             }
@@ -74,37 +113,43 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
     return { board: newBoard, changed: true };
 };
 
-// Spread Empathy: Spreads like a virus
-// Spread Empathy: Spreads like a virus, but only from the active player's stones
+// Spread Empathy: Grows at start of its owner's turn
 export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     const size = board.length;
     const newBoard = JSON.parse(JSON.stringify(board)) as Board;
-    const toAdd: { r: number; c: number }[] = [];
+    const toConvert: { r: number; c: number }[] = [];
 
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             const cell = board[r][c];
-            const isPlayerStone = activePlayer === 'black'
+
+            // Is it an Empathy stone owned by the player?
+            const isOwner = activePlayer === 'black'
                 ? cell.type === 'black'
                 : (cell.type === 'white' || cell.type === 'resistance');
 
-            if (isPlayerStone && cell.effects.includes('empathy')) {
+            if (isOwner && cell.effects.includes('empathy')) {
+                // Growth is blocked if Empathy is neutralized
+                if (isNeutralized(board, r, c)) continue;
+
                 const neighbors = getNeighbors(r, c, size);
                 for (const n of neighbors) {
-                    if (board[n.r][n.c].type !== 'empty' && !board[n.r][n.c].effects.includes('empathy')) {
-                        // Check if blocked by control
-                        const isBlockedByControl = getNeighbors(n.r, n.c, size).some(nn => board[nn.r][nn.c].effects.includes('control'));
-                        if (!isBlockedByControl) {
-                            toAdd.push({ r: n.r, c: n.c });
-                        }
+                    const neighbor = board[n.r][n.c];
+                    // Converts all orthogonally adjacent neutral stones (white and black)
+                    // Cannot convert Resistance, Control, Aggression, Manipulation, etc.
+                    if ((neighbor.type === 'white' || neighbor.type === 'black') &&
+                        neighbor.effects.length === 0) {
+                        toConvert.push({ r: n.r, c: n.c });
                     }
                 }
             }
         }
     }
 
-    toAdd.forEach(pos => {
-        newBoard[pos.r][pos.c].effects.push('empathy');
+    toConvert.forEach(pos => {
+        if (!newBoard[pos.r][pos.c].effects.includes('empathy')) {
+            newBoard[pos.r][pos.c].effects.push('empathy');
+        }
     });
 
     return newBoard;
@@ -117,6 +162,9 @@ export const triggerAggression = (board: Board, pos: { r: number; c: number }): 
     const { r, c } = pos;
 
     if (!board[r][c].effects.includes('aggression')) return newBoard;
+
+    // "Neutralized stones cannot use special abilities"
+    if (isNeutralized(board, r, c)) return newBoard;
 
     const directions = [
         { dr: 0, dc: 1 }, // horizontal
@@ -152,25 +200,20 @@ export const triggerAggression = (board: Board, pos: { r: number; c: number }): 
 // Go Capture Logic
 export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
     const size = board.length;
-    const visited = new Set<string>();
     let newBoard = JSON.parse(JSON.stringify(board)) as Board;
 
-    // We check for groups of stones that have no liberties
-    // A stone is captured if its entire group has 0 adjacent empty spaces
-
-    // Note: Usually in Go, you check the opponent's stones first, then your own.
-    const opponent = lastPlayer === 'black' ? 'white' : 'black';
-    const stoneTypes = lastPlayer === 'black' ? ['white', 'resistance'] : ['black'];
-
-    const getGroup = (r: number, c: number, type: StoneType | 'white-resistance') => {
+    const getGroupInfo = (b: Board, r: number, c: number) => {
         const group: { r: number; c: number }[] = [];
         const queue: { r: number; c: number }[] = [{ r, c }];
-        const groupType = board[r][c].type;
+        const groupType = b[r][c].type;
         const isWhiteResistance = (t: StoneType) => t === 'white' || t === 'resistance';
+        const targetIsWR = isWhiteResistance(groupType);
 
         const key = (r: number, c: number) => `${r}-${c}`;
         const localVisited = new Set<string>();
         localVisited.add(key(r, c));
+
+        let hasLiberties = false;
 
         while (queue.length > 0) {
             const curr = queue.shift()!;
@@ -178,45 +221,71 @@ export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
 
             const neighbors = getNeighbors(curr.r, curr.c, size);
             for (const n of neighbors) {
-                const nType = board[n.r][n.c].type;
-                const match = type === 'white-resistance'
-                    ? isWhiteResistance(nType)
-                    : nType === groupType;
+                const nType = b[n.r][n.c].type;
+                if (nType === 'empty') {
+                    hasLiberties = true;
+                } else {
+                    const match = targetIsWR
+                        ? isWhiteResistance(nType)
+                        : (nType === groupType);
 
-                if (match && !localVisited.has(key(n.r, n.c))) {
-                    localVisited.add(key(n.r, n.c));
-                    queue.push(n);
+                    if (match && !localVisited.has(key(n.r, n.c))) {
+                        localVisited.add(key(n.r, n.c));
+                        queue.push(n);
+                    }
                 }
             }
         }
-        return group;
+        return { group, hasLiberties };
     };
 
-    const hasLiberties = (group: { r: number; c: number }[]) => {
-        for (const p of group) {
-            const neighbors = getNeighbors(p.r, p.c, size);
-            if (neighbors.some(n => board[n.r][n.c].type === 'empty')) return true;
-        }
-        return false;
-    };
+    // Phase 1: Check for opponent captures first (Rule of Go)
+    const opponent = lastPlayer === 'black' ? 'white' : 'black';
+    const visited = new Set<string>();
 
-    // Check all cells
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
-            if (board[r][c].type === 'empty') continue;
-            if (visited.has(`${r}-${c}`)) continue;
+            const type = newBoard[r][c].type;
+            if (type === 'empty' || visited.has(`${r}-${c}`)) continue;
 
-            const type = board[r][c].type;
-            const group = getGroup(r, c, (type === 'white' || type === 'resistance') ? 'white-resistance' : 'black');
+            const isOpponent = opponent === 'black'
+                ? type === 'black'
+                : (type === 'white' || type === 'resistance');
 
-            group.forEach(p => visited.add(`${p.r}-${p.c}`));
+            if (isOpponent) {
+                const { group, hasLiberties } = getGroupInfo(newBoard, r, c);
+                group.forEach(p => visited.add(`${p.r}-${p.c}`));
+                if (!hasLiberties) {
+                    group.forEach(p => {
+                        newBoard[p.r][p.c].type = 'empty';
+                        newBoard[p.r][p.c].effects = [];
+                    });
+                }
+            }
+        }
+    }
 
-            if (!hasLiberties(group)) {
-                // Capture!
-                group.forEach(p => {
-                    newBoard[p.r][p.c].type = 'empty';
-                    newBoard[p.r][p.c].effects = [];
-                });
+    // Phase 2: Check for self-capture (suicide prevention)
+    visited.clear();
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const type = newBoard[r][c].type;
+            if (type === 'empty' || visited.has(`${r}-${c}`)) continue;
+
+            const isPlayer = lastPlayer === 'black'
+                ? type === 'black'
+                : (type === 'white' || type === 'resistance');
+
+            if (isPlayer) {
+                const { group, hasLiberties } = getGroupInfo(newBoard, r, c);
+                group.forEach(p => visited.add(`${p.r}-${p.c}`));
+                if (!hasLiberties) {
+                    // Suicide!
+                    group.forEach(p => {
+                        newBoard[p.r][p.c].type = 'empty';
+                        newBoard[p.r][p.c].effects = [];
+                    });
+                }
             }
         }
     }
@@ -430,11 +499,7 @@ export const getAIDecision = (
             if (effect) {
                 simulatedBoard[move.r][move.c].effects.push(effect);
                 if (effect === 'control') {
-                    getNeighbors(move.r, move.c, size).forEach(n => {
-                        if (!simulatedBoard[n.r][n.c].effects.includes('control')) {
-                            simulatedBoard[n.r][n.c].effects.push('control');
-                        }
-                    });
+                    // Control is now dynamic - checked via isNeutralized
                 }
             }
 
@@ -451,8 +516,22 @@ export const getAIDecision = (
 
             const score = minimax(simulatedBoard, depth - 1, -Infinity, Infinity, false, size);
 
-            if (score > bestEffectScore) {
-                bestEffectScore = score;
+            // Ko Rule / Negation Prevention: Avoid moves that restore recent states
+            let finalScore = score;
+            if (state.history.length > 0) {
+                const lastState = state.history[state.history.length - 1];
+                const boardMatchesLast = JSON.stringify(simulatedBoard) === JSON.stringify(lastState.board);
+                if (boardMatchesLast) finalScore -= 1000;
+
+                if (state.history.length > 1) {
+                    const secondLastState = state.history[state.history.length - 2];
+                    const boardMatchesSecondLast = JSON.stringify(simulatedBoard) === JSON.stringify(secondLastState.board);
+                    if (boardMatchesSecondLast) finalScore -= 800;
+                }
+            }
+
+            if (finalScore > bestEffectScore) {
+                bestEffectScore = finalScore;
                 bestEffect = effect;
             }
         }

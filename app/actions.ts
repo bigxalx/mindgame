@@ -2,7 +2,7 @@
 
 import { createGame, getGame, saveGame } from "@/lib/storage";
 import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
-import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors } from "@/lib/game";
+import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized } from "@/lib/game";
 
 export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -60,15 +60,8 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
 
     newBoard[r][c].type = player;
 
-    // Apply immediate control effect if placed
-    if (effect === 'control') {
-        const neighbors = getNeighbors(r, c, state.boardSize);
-        neighbors.forEach(n => {
-            if (!newBoard[n.r][n.c].effects.includes('control')) {
-                newBoard[n.r][n.c].effects.push('control');
-            }
-        });
-    }
+    // Apply immediate effect (Aggression/Manipulation)
+    // Control is now dynamic via isNeutralized helper
 
     if (effect === 'aggression' && newBoard[r][c].effects.includes('aggression')) {
         newBoard = triggerAggression(newBoard, { r, c });
@@ -76,7 +69,9 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
 
     newBoard = checkCaptures(newBoard, player);
 
-    const isManipulation = effect === 'manipulation' && newBoard[r][c].effects.includes('manipulation');
+    const isManipulation = effect === 'manipulation' &&
+        newBoard[r][c].effects.includes('manipulation') &&
+        !isNeutralized(newBoard, r, c);
 
     const newState: GameState = {
         ...state,

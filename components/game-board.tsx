@@ -118,7 +118,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
     }, [state.turn, isAiMode, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap]);
 
     const effectsList: { id: SpecialEffect; icon: any; color: string; label: string; desc: string }[] = [
-        { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Spreads green virus. Blocks resistance growth.' },
+        { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Converts adjacent neutral stones at turn start.' },
         { id: 'control', icon: Shield, color: 'text-blue-400', label: 'Control', desc: 'Blocks all spreading (Resistance & Empathy).' },
         { id: 'aggression', icon: Target, color: 'text-red-400', label: 'Aggression', desc: 'Place two in line to destroy stones between.' },
         { id: 'manipulation', icon: Zap, color: 'text-purple-400', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
@@ -364,7 +364,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                 {state.winner === 'black' ? 'BLACK WINS' : 'WHITE WINS'}
                             </h2>
                             <p className="text-slate-400 mb-6 font-medium">
-                                {state.winner === 'black' ? 'All yellow stones neutralized.' : 'The virus could not be contained.'}
+                                {state.winner === 'black' ? 'All resistance stones captured.' : 'The virus could not be contained.'}
                             </p>
                             <button
                                 onClick={() => window.location.reload()}
