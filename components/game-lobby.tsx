@@ -123,7 +123,7 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
             </CardContent>
             <CardFooter>
                 <p className="text-[10px] text-center w-full text-slate-500 leading-tight">
-                    Goal: As Black, capture all yellow stones. White defends. One stone turns yellow each turn.
+                    Goal: As Black, neutralize Resistance. White defends. One stone turns into Resistance each turn.
                 </p>
             </CardFooter>
         </Card>

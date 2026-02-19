@@ -170,8 +170,8 @@ export default function Home() {
                 {!state.moveConfirmed
                   ? "Your turn: Place a stone"
                   : state.pendingSwap
-                    ? "⚡ OPPORTUNITY ACTIVE: SWAP STONES"
-                    : "Action Complete: Finalize or Undo"}
+                    ? "⚡ MANIPULATION ACTIVE: SWAP STONES"
+                    : "Aggression Complete: Finalize or Undo"}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -204,7 +204,7 @@ export default function Home() {
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Goal</p>
-              <p className="text-sm">Capture all <span className="text-yellow-400 font-bold">Yellow</span> stones</p>
+              <p className="text-sm">Neutralize <span className="text-yellow-400 font-bold">Resistance</span></p>
             </div>
           </div>
         </Card>

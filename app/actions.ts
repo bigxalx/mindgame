@@ -2,13 +2,13 @@
 
 import { createGame, getGame, saveGame } from "@/lib/storage";
 import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
-import { createInitialBoard, checkCaptures, triggerAction, spreadYellow, spreadEmpathy, getNeighbors } from "@/lib/game";
+import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors } from "@/lib/game";
 
 export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const initialInventory = {
-        action: 2,
-        opportunity: 1,
+        aggression: 2,
+        manipulation: 1,
         control: 1,
         empathy: 1
     };
@@ -70,13 +70,13 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         });
     }
 
-    if (effect === 'action' && newBoard[r][c].effects.includes('action')) {
-        newBoard = triggerAction(newBoard, { r, c });
+    if (effect === 'aggression' && newBoard[r][c].effects.includes('aggression')) {
+        newBoard = triggerAggression(newBoard, { r, c });
     }
 
     newBoard = checkCaptures(newBoard, player);
 
-    const isOpportunity = effect === 'opportunity' && newBoard[r][c].effects.includes('opportunity');
+    const isManipulation = effect === 'manipulation' && newBoard[r][c].effects.includes('manipulation');
 
     const newState: GameState = {
         ...state,
@@ -84,7 +84,7 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         inventory: newInventory,
         history: history,
         moveConfirmed: true, // Stone placed, now player can only swap or end turn
-        pendingSwap: isOpportunity ? { r, c } : undefined,
+        pendingSwap: isManipulation ? { r, c } : undefined,
     };
 
     await saveGame(gameId, newState);
@@ -110,9 +110,9 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
     newBoard[r2][c2].type = tempType;
     newBoard[r2][c2].effects = tempEffects;
 
-    // Re-trigger action stones nearby
-    newBoard = triggerAction(newBoard, { r: r1, c: c1 });
-    newBoard = triggerAction(newBoard, { r: r2, c: c2 });
+    // Re-trigger aggression stones nearby
+    newBoard = triggerAggression(newBoard, { r: r1, c: c1 });
+    newBoard = triggerAggression(newBoard, { r: r2, c: c2 });
 
     newBoard = checkCaptures(newBoard, state.turn);
 
@@ -151,10 +151,10 @@ export async function commitTurn(gameId: string) {
     const nextPlayer = state.turn === 'black' ? 'white' : 'black';
 
     // Check for win conditions
-    let yellowFound = false;
+    let resistanceFound = false;
     for (const row of newBoard) {
         for (const cell of row) {
-            if (cell.type === 'yellow') yellowFound = true;
+            if (cell.type === 'resistance') resistanceFound = true;
         }
     }
 
@@ -163,7 +163,7 @@ export async function commitTurn(gameId: string) {
     newBoard = spreadEmpathy(newBoard, nextPlayer);
 
     if (nextPlayer === 'white') {
-        const result = spreadYellow(newBoard);
+        const result = spreadResistance(newBoard);
         newBoard = result.board;
     }
 
@@ -174,8 +174,8 @@ export async function commitTurn(gameId: string) {
         moveConfirmed: false,
         pendingSwap: undefined,
         history: [], // Clear history for new turn
-        gameOver: !yellowFound,
-        winner: !yellowFound ? 'black' : null,
+        gameOver: !resistanceFound,
+        winner: !resistanceFound ? 'black' : null,
     };
 
     await saveGame(gameId, newState);

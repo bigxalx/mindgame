@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "A high-stakes tactical board game of spread, control, and neutralization. Challenge your friends in real-time.",
   openGraph: {
     title: "MIND GAME | Tactical Strategy",
-    description: "Neutralize the yellow virus or protect it. A tactical battle of wits.",
+    description: "Neutralize the Resistance or protect it. A tactical battle of wits.",
     type: "website",
     siteName: "Mind Game Prototype",
     images: [

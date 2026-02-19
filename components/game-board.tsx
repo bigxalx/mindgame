@@ -36,7 +36,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                 if (dist <= 1) {
                     setSwapSelection({ r, c });
                 } else {
-                    toast.error("Can only swap adjacent to Opportunity stone");
+                    toast.error("Can only swap adjacent to Manipulation stone");
                 }
             } else {
                 const dist = Math.abs(r - swapSelection.r) + Math.abs(c - swapSelection.c);
@@ -87,7 +87,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                     return;
                 }
 
-                // Phase 2: Handle pending swap (Opportunity)
+                // Phase 2: Handle pending swap (Manipulation)
                 if (state.pendingSwap) {
                     setIsProcessing(true);
                     console.log("AI Phase 2: Handling swap at", state.pendingSwap);
@@ -118,13 +118,13 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
     }, [state.turn, isAiMode, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap]);
 
     const effectsList: { id: SpecialEffect; icon: any; color: string; label: string; desc: string }[] = [
-        { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Spreads green virus. Blocks yellowing.' },
-        { id: 'control', icon: Shield, color: 'text-blue-400', label: 'Control', desc: 'Blocks all spreading (Yellow & Empathy).' },
-        { id: 'action', icon: Target, color: 'text-red-400', label: 'Action', desc: 'Place two in line to destroy stones between.' },
-        { id: 'opportunity', icon: Zap, color: 'text-amber-400', label: 'Opportunity', desc: 'Swap adjacent stones upon placement.' },
+        { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Spreads green virus. Blocks resistance growth.' },
+        { id: 'control', icon: Shield, color: 'text-blue-400', label: 'Control', desc: 'Blocks all spreading (Resistance & Empathy).' },
+        { id: 'aggression', icon: Target, color: 'text-red-400', label: 'Aggression', desc: 'Place two in line to destroy stones between.' },
+        { id: 'manipulation', icon: Zap, color: 'text-purple-400', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
     ];
 
-    const currentInventory = role === 'spectator' ? { action: 0, opportunity: 0, control: 0, empathy: 0 } : state.inventory[role || state.turn];
+    const currentInventory = role === 'spectator' ? { aggression: 0, manipulation: 0, control: 0, empathy: 0 } : state.inventory[role || state.turn];
 
     const getAffectedCells = (r: number, c: number, effect: SpecialEffect | null) => {
         if (!effect) return [];
@@ -135,11 +135,11 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
         if (c > 0) neighbors.push({ r, c: c - 1 });
         if (c < size - 1) neighbors.push({ r, c: c + 1 });
 
-        if (effect === 'empathy' || effect === 'control' || effect === 'opportunity') {
+        if (effect === 'empathy' || effect === 'control' || effect === 'manipulation') {
             return neighbors.filter(n => state.board[n.r][n.c].type !== 'empty');
         }
 
-        if (effect === 'action') {
+        if (effect === 'aggression') {
             const affected: { r: number; c: number }[] = [];
             const directions = [{ dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: -1, dc: 0 }];
             directions.forEach(({ dr, dc }) => {
@@ -148,7 +148,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                 const path = [];
                 while (currR >= 0 && currR < size && currC >= 0 && currC < size) {
                     if (state.board[currR][currC].type === 'empty') break;
-                    if (state.board[currR][currC].effects.includes('action')) {
+                    if (state.board[currR][currC].effects.includes('aggression')) {
                         affected.push(...path);
                         break;
                     }
@@ -170,7 +170,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
             {/* Special Stones Selector */}
             <div className="w-full max-w-md space-y-3">
                 <div className="flex justify-between items-center mb-1 px-1">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Special Stones</p>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Stones</p>
                     <p className="text-[10px] text-slate-400 font-medium">Player: <span className="uppercase text-slate-200">{role || state.turn}</span></p>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
@@ -304,7 +304,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                                     "w-[68%] h-[68%] rounded-full z-10 shadow-lg relative transition-all duration-300 border",
                                                     cell.type === 'black' && "bg-black border-slate-700 shadow-black/80",
                                                     cell.type === 'white' && "bg-white border-slate-200 shadow-white/20",
-                                                    cell.type === 'yellow' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/20",
+                                                    cell.type === 'resistance' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/20",
                                                     swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900"
                                                 )}
                                             >
@@ -316,7 +316,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                                     {cell.effects.includes('control') && !cell.effects.includes('empathy') && (
                                                         <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_blue] border border-blue-500/50" />
                                                     )}
-                                                    {cell.effects.includes('action') && !cell.effects.includes('empathy') && !cell.effects.includes('control') && (
+                                                    {cell.effects.includes('aggression') && !cell.effects.includes('empathy') && !cell.effects.includes('control') && (
                                                         <div className="text-[12px] font-black text-slate-400 tracking-tighter">X</div>
                                                     )}
 

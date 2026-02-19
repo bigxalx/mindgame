@@ -1,5 +1,5 @@
-export type StoneType = 'black' | 'white' | 'yellow' | 'empty';
-export type SpecialEffect = 'empathy' | 'control' | 'action' | 'opportunity';
+export type StoneType = 'black' | 'white' | 'resistance' | 'empty';
+export type SpecialEffect = 'empathy' | 'control' | 'aggression' | 'manipulation';
 export type AIDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'impossible';
 
 export interface Cell {
@@ -22,7 +22,7 @@ export interface GameState {
     winner: Player | null;
     boardSize: number;
     inventory: Record<Player, Inventory>;
-    pendingSwap?: { r: number; c: number }; // For Opportunity stone
+    pendingSwap?: { r: number; c: number }; // For Manipulation stone
     moveConfirmed: boolean; // Has the player placed their main stone?
     difficulty?: AIDifficulty;
     isAiGame?: boolean;

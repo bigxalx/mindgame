@@ -14,16 +14,16 @@ export const createInitialBoard = (size: number): Board => {
         board.push(row);
     }
 
-    // White starts with 1-2 yellow stones
-    const numYellow = Math.floor(Math.random() * 2) + 1;
+    // White starts with 1-2 resistance stones
+    const numResistance = Math.floor(Math.random() * 2) + 1;
     const positions: [number, number][] = [];
 
-    while (positions.length < numYellow) {
+    while (positions.length < numResistance) {
         const r = Math.floor(Math.random() * size);
         const c = Math.floor(Math.random() * size);
         if (!positions.some(p => p[0] === r && p[1] === c)) {
             positions.push([r, c]);
-            board[r][c].type = 'yellow';
+            board[r][c].type = 'resistance';
         }
     }
 
@@ -39,25 +39,25 @@ export const getNeighbors = (r: number, c: number, size: number) => {
     return neighbors;
 };
 
-// Spread yellow: One white stone turns yellow if adjacent to yellow
-export const spreadYellow = (board: Board): { board: Board; changed: boolean } => {
+// Spread resistance: One white stone turns resistance if adjacent to resistance
+export const spreadResistance = (board: Board): { board: Board; changed: boolean } => {
     const size = board.length;
     const candidates: { r: number; c: number }[] = [];
 
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (board[r][c].type === 'white') {
-                // Check if adjacent to yellow
+                // Check if adjacent to resistance
                 const neighbors = getNeighbors(r, c, size);
-                const isAdjToYellow = neighbors.some(n => board[n.r][n.c].type === 'yellow');
+                const isAdjToResistance = neighbors.some(n => board[n.r][n.c].type === 'resistance');
 
-                // Cannot turn yellow if has empathy
+                // Cannot turn resistance if has empathy
                 const hasEmpathy = board[r][c].effects.includes('empathy');
 
                 // Check for control stones nearby that stop spread
                 const isBlockedByControl = neighbors.some(n => board[n.r][n.c].effects.includes('control'));
 
-                if (isAdjToYellow && !hasEmpathy && !isBlockedByControl) {
+                if (isAdjToResistance && !hasEmpathy && !isBlockedByControl) {
                     candidates.push({ r, c });
                 }
             }
@@ -69,7 +69,7 @@ export const spreadYellow = (board: Board): { board: Board; changed: boolean } =
     const randomIdx = Math.floor(Math.random() * candidates.length);
     const target = candidates[randomIdx];
     const newBoard = JSON.parse(JSON.stringify(board)) as Board;
-    newBoard[target.r][target.c].type = 'yellow';
+    newBoard[target.r][target.c].type = 'resistance';
 
     return { board: newBoard, changed: true };
 };
@@ -86,7 +86,7 @@ export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
             const cell = board[r][c];
             const isPlayerStone = activePlayer === 'black'
                 ? cell.type === 'black'
-                : (cell.type === 'white' || cell.type === 'yellow');
+                : (cell.type === 'white' || cell.type === 'resistance');
 
             if (isPlayerStone && cell.effects.includes('empathy')) {
                 const neighbors = getNeighbors(r, c, size);
@@ -110,13 +110,13 @@ export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     return newBoard;
 };
 
-// Action stones: Destruction between two
-export const triggerAction = (board: Board, pos: { r: number; c: number }): Board => {
+// Aggression stones: Destruction between two
+export const triggerAggression = (board: Board, pos: { r: number; c: number }): Board => {
     const size = board.length;
     const newBoard = JSON.parse(JSON.stringify(board)) as Board;
     const { r, c } = pos;
 
-    if (!board[r][c].effects.includes('action')) return newBoard;
+    if (!board[r][c].effects.includes('aggression')) return newBoard;
 
     const directions = [
         { dr: 0, dc: 1 }, // horizontal
@@ -132,8 +132,8 @@ export const triggerAction = (board: Board, pos: { r: number; c: number }): Boar
 
         while (currR >= 0 && currR < size && currC >= 0 && currC < size) {
             if (board[currR][currC].type === 'empty') break; // Must be filled
-            if (board[currR][currC].effects.includes('action')) {
-                // Found another action stone! Remove everything in between
+            if (board[currR][currC].effects.includes('aggression')) {
+                // Found another aggression stone! Remove everything in between
                 path.forEach(p => {
                     newBoard[p.r][p.c].type = 'empty';
                     newBoard[p.r][p.c].effects = [];
@@ -160,13 +160,13 @@ export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
 
     // Note: Usually in Go, you check the opponent's stones first, then your own.
     const opponent = lastPlayer === 'black' ? 'white' : 'black';
-    const stoneTypes = lastPlayer === 'black' ? ['white', 'yellow'] : ['black'];
+    const stoneTypes = lastPlayer === 'black' ? ['white', 'resistance'] : ['black'];
 
-    const getGroup = (r: number, c: number, type: StoneType | 'white-yellow') => {
+    const getGroup = (r: number, c: number, type: StoneType | 'white-resistance') => {
         const group: { r: number; c: number }[] = [];
         const queue: { r: number; c: number }[] = [{ r, c }];
         const groupType = board[r][c].type;
-        const isWhiteYellow = (t: StoneType) => t === 'white' || t === 'yellow';
+        const isWhiteResistance = (t: StoneType) => t === 'white' || t === 'resistance';
 
         const key = (r: number, c: number) => `${r}-${c}`;
         const localVisited = new Set<string>();
@@ -179,8 +179,8 @@ export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
             const neighbors = getNeighbors(curr.r, curr.c, size);
             for (const n of neighbors) {
                 const nType = board[n.r][n.c].type;
-                const match = type === 'white-yellow'
-                    ? isWhiteYellow(nType)
+                const match = type === 'white-resistance'
+                    ? isWhiteResistance(nType)
                     : nType === groupType;
 
                 if (match && !localVisited.has(key(n.r, n.c))) {
@@ -207,7 +207,7 @@ export const checkCaptures = (board: Board, lastPlayer: Player): Board => {
             if (visited.has(`${r}-${c}`)) continue;
 
             const type = board[r][c].type;
-            const group = getGroup(r, c, (type === 'white' || type === 'yellow') ? 'white-yellow' : 'black');
+            const group = getGroup(r, c, (type === 'white' || type === 'resistance') ? 'white-resistance' : 'black');
 
             group.forEach(p => visited.add(`${p.r}-${p.c}`));
 
@@ -234,13 +234,13 @@ const evaluateBoardDeep = (board: Board, size: number): number => {
     const visited = new Set<string>();
 
     // Helper: Find group and its liberties
-    const getGroupInfo = (r: number, c: number, type: 'black' | 'white-yellow') => {
+    const getGroupInfo = (r: number, c: number, type: 'black' | 'white-resistance') => {
         const group: { r: number; c: number }[] = [];
         const queue: { r: number; c: number }[] = [{ r, c }];
         const liberties = new Set<string>();
         const localVisited = new Set<string>();
         const stoneType = board[r][c].type;
-        const isWhiteYellow = (t: StoneType) => t === 'white' || t === 'yellow';
+        const isWhiteResistance = (t: StoneType) => t === 'white' || t === 'resistance';
 
         localVisited.add(`${r}-${c}`);
 
@@ -254,7 +254,7 @@ const evaluateBoardDeep = (board: Board, size: number): number => {
                 if (nType === 'empty') {
                     liberties.add(`${n.r}-${n.c}`);
                 } else {
-                    const match = type === 'white-yellow' ? isWhiteYellow(nType) : nType === 'black';
+                    const match = type === 'white-resistance' ? isWhiteResistance(nType) : nType === 'black';
                     if (match && !localVisited.has(`${n.r}-${n.c}`)) {
                         localVisited.add(`${n.r}-${n.c}`);
                         queue.push(n);
@@ -270,24 +270,24 @@ const evaluateBoardDeep = (board: Board, size: number): number => {
             const cell = board[r][c];
             if (cell.type === 'empty' || visited.has(`${r}-${c}`)) continue;
 
-            const isWY = cell.type === 'white' || cell.type === 'yellow';
-            const groupInfo = getGroupInfo(r, c, isWY ? 'white-yellow' : 'black');
+            const isWR = cell.type === 'white' || cell.type === 'resistance';
+            const groupInfo = getGroupInfo(r, c, isWR ? 'white-resistance' : 'black');
             groupInfo.group.forEach(p => visited.add(`${p.r}-${p.c}`));
 
             // Score based on group size and vitality (liberties)
             const count = groupInfo.group.length;
             const libs = groupInfo.libertyCount;
 
-            if (isWY) {
-                // White/Yellow scoring
+            if (isWR) {
+                // White/Resistance scoring
                 score += count * 15; // Raw presence
                 if (libs === 1) score -= 150; // Danger! (Atari)
                 else if (libs === 2) score += 40;
                 else if (libs >= 3) score += 100;
 
-                // Special bonus for yellow stones specifically
-                const yellowCount = groupInfo.group.filter(p => board[p.r][p.c].type === 'yellow').length;
-                score += yellowCount * 120;
+                // Special bonus for resistance stones specifically
+                const resistanceCount = groupInfo.group.filter(p => board[p.r][p.c].type === 'resistance').length;
+                score += resistanceCount * 120;
 
                 // Empathy protection bonus
                 const groupHasEmpathy = groupInfo.group.some(p => board[p.r][p.c].effects.includes('empathy'));
@@ -345,7 +345,7 @@ const minimax = (
         const neighbors = getNeighbors(m.r, m.c, size);
         neighbors.forEach(n => {
             if (board[n.r][n.c].type === 'black') score += 10;
-            if (board[n.r][n.c].type === 'yellow') score += 20;
+            if (board[n.r][n.c].type === 'resistance') score += 20;
         });
         return { ...m, quickScore: score };
     }).sort((a, b) => b.quickScore - a.quickScore);
@@ -377,9 +377,9 @@ const minimax = (
 
             // Start of White's turn:
             let nextTurnBoard = spreadEmpathy(nextBoard, 'white');
-            const { board: yellowBoard } = spreadYellow(nextTurnBoard);
+            const { board: resistanceBoard } = spreadResistance(nextTurnBoard);
 
-            const evalScore = minimax(yellowBoard, depth - 1, alpha, beta, true, size);
+            const evalScore = minimax(resistanceBoard, depth - 1, alpha, beta, true, size);
             minEval = Math.min(minEval, evalScore);
             beta = Math.min(beta, evalScore);
             if (beta <= alpha) break;
@@ -438,14 +438,14 @@ export const getAIDecision = (
                 }
             }
 
-            if (effect === 'action') simulatedBoard = triggerAction(simulatedBoard, move);
+            if (effect === 'aggression') simulatedBoard = triggerAggression(simulatedBoard, move);
             simulatedBoard = checkCaptures(simulatedBoard, turn);
 
             // Simulating turn transition to opponent
             const opponent = turn === 'black' ? 'white' : 'black';
             simulatedBoard = spreadEmpathy(simulatedBoard, opponent);
             if (opponent === 'white') {
-                const spreadRes = spreadYellow(simulatedBoard);
+                const spreadRes = spreadResistance(simulatedBoard);
                 simulatedBoard = spreadRes.board;
             }
 
