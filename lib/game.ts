@@ -89,7 +89,7 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
 
                 // Check if adjacent to resistance
                 const neighbors = getNeighbors(r, c, size);
-                const isAdjToResistance = neighbors.some(n => board[n.r][n.c].type === 'resistance');
+                const isAdjToResistance = neighbors.some(n => board[n.r][n.c].type === 'resistance' && !isNeutralized(board, n.r, n.c));
 
                 if (isAdjToResistance) {
                     candidates.push({ r, c });

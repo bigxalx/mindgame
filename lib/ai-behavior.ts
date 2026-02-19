@@ -146,28 +146,42 @@ function weakensResistance(candidate: CandidateMove, board: Board, size: number)
 }
 
 function createsAggressionVulnerability(candidate: CandidateMove, board: Board, size: number): boolean {
-    // If placing here would complete a line between two black aggression stones
+    // Placing here would put this stone between two black aggression stones on the same axis
+    // — it would be destroyed when Black fires the beam.
+    // Requires a black aggression stone found in BOTH the + and - directions on the same axis.
     const { r, c } = candidate;
     const directions = [{ dr: 0, dc: 1 }, { dr: 1, dc: 0 }];
     for (const { dr, dc } of directions) {
-        let found = false;
+        let foundPositive = false;
+        let foundNegative = false;
         for (const sign of [-1, 1]) {
             let cr = r + dr * sign, cc = c + dc * sign;
             while (cr >= 0 && cr < size && cc >= 0 && cc < size) {
                 const t = board[cr][cc].type;
-                if (t === 'empty') break;
-                if (t === 'collapse') break;
+                if (t === 'empty' || t === 'collapse') break;
                 if (t === 'black' && board[cr][cc].effects.includes('aggression')) {
-                    found = true;
+                    if (sign === 1) foundPositive = true;
+                    else foundNegative = true;
                     break;
                 }
                 cr += dr * sign;
                 cc += dc * sign;
             }
         }
-        if (found) return true;
+        // Only vulnerable if aggression exists on BOTH sides
+        if (foundPositive && foundNegative) return true;
     }
     return false;
+}
+
+function isAdjacentToActiveEmpathy(candidate: CandidateMove, board: Board, size: number, opponent: Player): boolean {
+    const neighbors = getNeighbors(candidate.r, candidate.c, size);
+    return neighbors.some(n => {
+        const cell = board[n.r][n.c];
+        return cell.type === opponent &&
+            cell.effects.includes('empathy') &&
+            !isNeutralized(board, n.r, n.c);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -177,14 +191,17 @@ function createsAggressionVulnerability(candidate: CandidateMove, board: Board, 
 /** B1: Prevent Immediate Resistance Loss (Priority 100, Chance 1.0) */
 function b1_preventResistanceLoss(state: GameState): CandidateMove | null {
     const { board, boardSize: size } = state;
+    // Only care about groups that contain at least one resistance stone — pure white groups
+    // aren't critical enough to always save at the cost of a strategic move.
     const wrGroups = getAllGroups(board, size, t => t === 'white' || t === 'resistance');
-    const dangerGroups = wrGroups.filter(g => g.liberties.length <= 1);
+    const dangerGroups = wrGroups.filter(g =>
+        g.liberties.length === 1 &&
+        g.group.some(p => board[p.r][p.c].type === 'resistance')
+    );
     for (const g of dangerGroups) {
-        if (g.liberties.length === 1) {
-            const lib = g.liberties[0];
-            if (isEmptyCell(board, lib.r, lib.c)) {
-                return { r: lib.r, c: lib.c, effect: null };
-            }
+        const lib = g.liberties[0];
+        if (isEmptyCell(board, lib.r, lib.c)) {
+            return { r: lib.r, c: lib.c, effect: null };
         }
     }
     return null;
@@ -290,7 +307,8 @@ function b5_respondToEmpathy(state: GameState): CandidateMove | null {
 /** B6: Respond to Player Aggression (Priority 70, Chance 0.8) */
 function b6_respondToAggression(state: GameState): CandidateMove | null {
     const { board, boardSize: size } = state;
-    // Find pairs of black aggression stones on same row or column
+    // Strategy: try to CAPTURE black aggression stones (put them in atari).
+    // Placing INTO the beam would just get our stone destroyed — avoid that.
     const aggrStones: { r: number; c: number }[] = [];
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
@@ -299,26 +317,21 @@ function b6_respondToAggression(state: GameState): CandidateMove | null {
             }
         }
     }
-    for (let i = 0; i < aggrStones.length; i++) {
-        for (let j = i + 1; j < aggrStones.length; j++) {
-            const a = aggrStones[i], b = aggrStones[j];
-            if (a.r === b.r) {
-                // Same row — find empty cells between them
-                const minC = Math.min(a.c, b.c), maxC = Math.max(a.c, b.c);
-                for (let c = minC + 1; c < maxC; c++) {
-                    if (isEmptyCell(board, a.r, c)) {
-                        return { r: a.r, c, effect: null }; // block the beam
-                    }
-                }
-            } else if (a.c === b.c) {
-                // Same column
-                const minR = Math.min(a.r, b.r), maxR = Math.max(a.r, b.r);
-                for (let r = minR + 1; r < maxR; r++) {
-                    if (isEmptyCell(board, r, a.c)) {
-                        return { r, c: a.c, effect: null };
-                    }
-                }
+    if (aggrStones.length === 0) return null;
+
+    // Try to put each aggression stone's group into atari (1 liberty left)
+    for (const as of aggrStones) {
+        const info = getGroupInfo(board, as.r, as.c, size);
+        if (info.liberties.length === 1) {
+            const lib = info.liberties[0];
+            if (isEmptyCell(board, lib.r, lib.c)) {
+                return { r: lib.r, c: lib.c, effect: null };
             }
+        }
+        // Reduce liberties: place on any liberty of this aggression group
+        if (info.liberties.length === 2) {
+            const target = randomFrom(info.liberties.filter(l => isEmptyCell(board, l.r, l.c)));
+            if (target) return { r: target.r, c: target.c, effect: null };
         }
     }
     return null;
@@ -449,13 +462,13 @@ function b11_npcManipulation(state: GameState): CandidateMove | null {
                 simBoard[r][c].type = simBoard[n.r][n.c].type;
                 simBoard[n.r][n.c].type = tempType;
 
-                // Score: how many black stones are captured after this?
+                // Score: how many BLACK stones are captured after this swap?
+                // Use d.type — the type recorded BEFORE checkCaptures cleared the cell to 'empty'.
                 const { destroyed } = checkCaptures(simBoard, turn);
-                const gain = destroyed.filter(d => simBoard[d.r][d.c].type !== 'white' && simBoard[d.r][d.c].type !== 'resistance').length;
-
-                // Extra score if a resistance stone gets freed
-                const resistanceFree = destroyed.some(d => board[d.r][d.c].type === 'black');
-                const score = gain * 10 + (resistanceFree ? 5 : 0);
+                const gain = destroyed.filter(d => d.type === 'black').length;
+                // Penalise if we accidentally capture our own white/resistance stones
+                const selfLoss = destroyed.filter(d => d.type === 'white' || d.type === 'resistance').length;
+                const score = gain * 10 - selfLoss * 15;
                 if (score > bestScore) {
                     bestScore = score;
                     bestMove = {
@@ -484,34 +497,55 @@ function b12_npcAggression(state: GameState): CandidateMove | null {
         }
     }
 
-    // For each empty cell, check if placing aggression there creates a line with an existing
-    // aggression stone that would destroy >= 2 black/mixed stones
+    // Score each potential beam using a weighted trade-off:
+    //   black stone         = +1  (standard enemy kill)
+    //   black special stone = +2  (special stones are more valuable)
+    //   own white stone     = -1  (acceptable collateral if net positive)
+    //   own resistance      = hard abort (never acceptable to destroy resistance)
+    // Fire only if net score > 0 AND we destroy strictly more enemy stones than we lose.
+    let bestScore = 1; // must beat this threshold (i.e. net > 0 minimum)
+    let bestMove: CandidateMove | null = null;
+
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (!isEmptyCell(board, r, c)) continue;
             for (const ea of existingAggr) {
-                if (ea.r !== r && ea.c !== c) continue; // must be same row or col
-                let count = 0;
+                if (ea.r !== r && ea.c !== c) continue;
+                let netScore = 0;
+                let blackDestroyed = 0;
+                let whiteDestroyed = 0;
+                let abort = false;
+
+                const cells: { r: number; c: number }[] = [];
                 if (ea.r === r) {
                     const minC = Math.min(ea.c, c), maxC = Math.max(ea.c, c);
-                    for (let cc = minC + 1; cc < maxC; cc++) {
-                        const t = board[r][cc].type;
-                        if (t !== 'empty' && t !== 'collapse') count++;
-                    }
+                    for (let cc = minC + 1; cc < maxC; cc++) cells.push({ r, c: cc });
                 } else {
                     const minR = Math.min(ea.r, r), maxR = Math.max(ea.r, r);
-                    for (let rr = minR + 1; rr < maxR; rr++) {
-                        const t = board[rr][c].type;
-                        if (t !== 'empty' && t !== 'collapse') count++;
+                    for (let rr = minR + 1; rr < maxR; rr++) cells.push({ r: rr, c });
+                }
+
+                for (const cell of cells) {
+                    const t = board[cell.r][cell.c].type;
+                    if (t === 'empty' || t === 'collapse') continue;
+                    if (t === 'resistance') { abort = true; break; } // never destroy own resistance
+                    if (t === 'white') { netScore -= 1; whiteDestroyed++; }
+                    if (t === 'black') {
+                        const isSpecial = board[cell.r][cell.c].effects.length > 0;
+                        netScore += isSpecial ? 2 : 1;
+                        blackDestroyed++;
                     }
                 }
-                if (count >= 2) {
-                    return { r, c, effect: 'aggression' };
+
+                // Must be net positive AND destroy more enemy than self
+                if (!abort && netScore > bestScore && blackDestroyed > whiteDestroyed) {
+                    bestScore = netScore;
+                    bestMove = { r, c, effect: 'aggression' };
                 }
             }
         }
     }
-    return null;
+    return bestMove;
 }
 
 /** B13: Place NPC Empathy (Priority 40, Chance 0.6) */
@@ -577,7 +611,13 @@ function b16_positionalImprovement(state: GameState): CandidateMove | null {
                 const t = board[n.r][n.c].type;
                 if (t === 'resistance') score += 20;
                 else if (t === 'white') score += 10;
-                else if (t === 'black') score += 5; // adjacent to enemy = tactical value
+                else if (t === 'black') {
+                    score += 5;
+                    // HARD PENALTY: Don't settle next to active empathy!
+                    if (board[n.r][n.c].effects.includes('empathy') && !isNeutralized(board, n.r, n.c)) {
+                        score -= 60;
+                    }
+                }
             }
             // Center preference
             const distToCenter = Math.abs(r - size / 2) + Math.abs(c - size / 2);
@@ -601,11 +641,11 @@ export const DEFAULT_BEHAVIOR_CONFIG: BehaviorConfig[] = [
     { priority: 90, triggerChance: 0.95, name: 'Avoid Encirclement', generate: b2_avoidEncirclement },
     { priority: 85, triggerChance: 0.85, name: 'Capture Player Stones', generate: b3_capturePlayerStones },
     { priority: 80, triggerChance: 0.9, name: 'Prevent Control of Resistance', generate: b4_preventControlOfResistance },
-    { priority: 75, triggerChance: 0.85, name: 'Respond to Empathy', generate: b5_respondToEmpathy },
+    { priority: 90, triggerChance: 1.0, name: 'Respond to Empathy', generate: b5_respondToEmpathy },
     { priority: 70, triggerChance: 0.8, name: 'Respond to Aggression', generate: b6_respondToAggression },
     { priority: 65, triggerChance: 0.75, name: 'Respond to Control', generate: b7_respondToControl },
-    { priority: 60, triggerChance: 0.85, name: 'Expand Resistance', generate: b8_expandResistance },
-    { priority: 55, triggerChance: 0.8, name: 'Enable Resistance Growth', generate: b9_enableResistanceGrowth },
+    { priority: 48, triggerChance: 0.68, name: 'Expand Resistance', generate: b8_expandResistance },
+    { priority: 44, triggerChance: 0.64, name: 'Enable Resistance Growth', generate: b9_enableResistanceGrowth },
     { priority: 50, triggerChance: 0.65, name: 'Place NPC Control', generate: b10_placeNpcControl },
     { priority: 50, triggerChance: 0.6, name: 'Use NPC Manipulation', generate: b11_npcManipulation },
     { priority: 45, triggerChance: 0.6, name: 'Place NPC Aggression', generate: b12_npcAggression },
@@ -648,6 +688,13 @@ export function runBehaviorTree(
 
         // B17 – Negation Prevention: skip if this restores a recent board state
         if (isNegationMove(candidate, state)) continue;
+
+        // NEW: Avoid Empathy Conversion. Skip if move is adjacent to active player empathy,
+        // UNLESS the priority is high (defending resistance or capturing).
+        if (behavior.priority < 96 && isAdjacentToActiveEmpathy(candidate, state.board, size, state.turn === 'black' ? 'white' : 'black')) {
+            console.log(`[BT] Skipping "${behavior.name}" due to empathy conversion risk`);
+            continue;
+        }
 
         console.log(`[BT] Executing behavior: "${behavior.name}" → (${candidate.r},${candidate.c}) effect=${candidate.effect}`);
         return candidate;

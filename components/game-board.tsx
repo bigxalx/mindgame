@@ -259,10 +259,13 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                         <p className="text-[10px] text-slate-400 font-medium">Player: <span className="uppercase text-slate-200">{role || state.turn}</span></p>
                         <button
                             onClick={() => { setShowHelp(true); setHelpTab('goal'); }}
-                            className="text-slate-500 hover:text-slate-300 transition-colors"
+                            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-400/70 hover:text-amber-300 transition-all duration-200 group"
                             title="Rules & Help"
                         >
-                            <HelpCircle className="w-4 h-4" />
+                            {/* pulse ring */}
+                            <span className="absolute inset-0 rounded-full ring-1 ring-amber-400/30 animate-ping group-hover:hidden" />
+                            <HelpCircle className="w-4 h-4 shrink-0" />
+                            <span className="text-[10px] font-semibold tracking-wide uppercase">Rules</span>
                         </button>
                     </div>
                 </div>
@@ -567,22 +570,22 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                                     cell.effects.includes('empathy') && (
                                                         isNeutralized(state.board, r, c)
                                                             ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : "ring-[10px] ring-inset ring-emerald-500/40"
+                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-emerald-500/40" : "ring-[14px] ring-inset ring-emerald-500/70")
                                                     ),
                                                     cell.effects.includes('control') && (
                                                         isNeutralized(state.board, r, c)
-                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : "ring-[10px] ring-inset ring-blue-500/40"
+                                                            ? "ring-[10px] ring-inset ring-blue-500/20 opacity-60 blur-[1px]"
+                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-blue-500/40" : "ring-[14px] ring-inset ring-blue-500/70")
                                                     ),
                                                     cell.effects.includes('aggression') && (
                                                         isNeutralized(state.board, r, c)
                                                             ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : "ring-[10px] ring-inset ring-rose-500/40"
+                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-rose-500/40" : "ring-[14px] ring-inset ring-rose-500/70")
                                                     ),
                                                     cell.effects.includes('manipulation') && (
                                                         isNeutralized(state.board, r, c)
                                                             ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : "ring-[10px] ring-inset ring-purple-500/40"
+                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-purple-500/40" : "ring-[14px] ring-inset ring-purple-500/70")
                                                     ),
                                                     swapSelection?.r === r && swapSelection?.c === c && "ring-[4px] ring-white scale-110 shadow-[0_0_30px_rgba(255,255,255,0.8)]"
                                                 )}
