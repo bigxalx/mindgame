@@ -29,6 +29,13 @@ export const createInitialBoard = (size: number, numResistance: number = 2): Boa
     return board;
 };
 
+/**
+ * Lightweight board cloner (faster than JSON.parse/stringify)
+ */
+export const cloneBoard = (board: Board): Board => {
+    return board.map(row => row.map(cell => ({ ...cell, effects: [...cell.effects] })));
+};
+
 export const getNeighbors = (r: number, c: number, size: number) => {
     const neighbors: { r: number; c: number }[] = [];
     if (r > 0) neighbors.push({ r: r - 1, c });
@@ -102,7 +109,7 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
 
     const randomIdx = Math.floor(Math.random() * candidates.length);
     const target = candidates[randomIdx];
-    const newBoard = JSON.parse(JSON.stringify(board)) as Board;
+    const newBoard = cloneBoard(board);
     newBoard[target.r][target.c].type = 'resistance';
 
     return { board: newBoard, changed: true };
@@ -111,7 +118,7 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
 // Spread Empathy: Grows at start of its owner's turn
 export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     const size = board.length;
-    const newBoard = JSON.parse(JSON.stringify(board)) as Board;
+    const newBoard = cloneBoard(board);
     const toConvert = new Set<string>();
 
     const isNeutral = (r: number, c: number) => {
@@ -157,7 +164,7 @@ export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
 // Aggression stones: Destruction between two
 export const triggerAggression = (board: Board, pos: { r: number; c: number }): { board: Board; destroyed: { r: number; c: number; type: StoneType }[] } => {
     const size = board.length;
-    const newBoard = JSON.parse(JSON.stringify(board)) as Board;
+    const newBoard = cloneBoard(board);
     const { r, c } = pos;
     const destroyed: { r: number; c: number; type: StoneType }[] = [];
 
@@ -201,7 +208,7 @@ export const triggerAggression = (board: Board, pos: { r: number; c: number }): 
 // Go Capture Logic
 export const checkCaptures = (board: Board, lastPlayer: Player): { board: Board; destroyed: { r: number; c: number; type: StoneType }[] } => {
     const size = board.length;
-    let newBoard = JSON.parse(JSON.stringify(board)) as Board;
+    let newBoard = cloneBoard(board);
     const destroyed: { r: number; c: number; type: StoneType }[] = [];
 
     const getGroupInfo = (b: Board, r: number, c: number) => {
@@ -304,7 +311,7 @@ export const handleResolutionEvent = (
     lastPlayer: Player,
     turnCount: number
 ): Board => {
-    let newBoard = JSON.parse(JSON.stringify(board)) as Board;
+    let newBoard = cloneBoard(board);
     const size = board.length;
 
     if (destroyedList.length === 0) return newBoard;
@@ -504,7 +511,7 @@ const minimax = (
     if (isMaximizing) {
         let maxEval = -Infinity;
         for (const move of scoredMoves) {
-            let nextBoard = JSON.parse(JSON.stringify(board)) as Board;
+            let nextBoard = cloneBoard(board);
             nextBoard[move.r][move.c].id = `sim-${move.r}-${move.c}-${depth}`;
             nextBoard[move.r][move.c].type = 'white';
             const { board: capturedBoard } = checkCaptures(nextBoard, 'white');
@@ -522,7 +529,7 @@ const minimax = (
     } else {
         let minEval = Infinity;
         for (const move of scoredMoves) {
-            let nextBoard = JSON.parse(JSON.stringify(board)) as Board;
+            let nextBoard = cloneBoard(board);
             nextBoard[move.r][move.c].id = `sim-${move.r}-${move.c}-${depth}`;
             nextBoard[move.r][move.c].type = 'black';
             const { board: capturedBoard } = checkCaptures(nextBoard, 'black');
@@ -571,9 +578,15 @@ export const getAIDecision = (
     if (difficulty === 'impossible') depth = 4;
 
     // Adaptive depth based on complexity to avoid hang
-    if (size >= 6 && depth > 2) depth = 2;
-    if (validMoves.length > 20 && depth > 2) depth = 2;
+    // PERFORMANCE BUDEGT:
+    // 7x7+ boards: Hard Depth 2 -> 1, Expert Depth 3 -> 2
+    if (size >= 7) {
+        if (difficulty === 'hard') depth = 1;
+        if (difficulty === 'expert') depth = 2;
+    }
+    if (validMoves.length > 25 && depth > 2) depth = 2;
 
+    console.time(`AI Decision (${difficulty}, depth ${depth})`);
     const moveEvaluations = validMoves.map(move => {
         let bestEffectScore = -Infinity;
         let bestEffect: SpecialEffect | null = null;
@@ -596,7 +609,7 @@ export const getAIDecision = (
                     const neighborType = board[n.r][n.c].type;
                     if (neighborType === 'empty' || neighborType === 'collapse') continue;
 
-                    let simulatedBoard = JSON.parse(JSON.stringify(board)) as Board;
+                    let simulatedBoard = cloneBoard(board);
                     simulatedBoard[move.r][move.c].type = turn;
                     simulatedBoard[move.r][move.c].effects.push('manipulation');
 
@@ -670,5 +683,6 @@ export const getAIDecision = (
         return top[Math.floor(Math.random() * top.length)];
     }
 
+    console.timeEnd(`AI Decision (${difficulty}, depth ${depth})`);
     return moveEvaluations[0];
 };

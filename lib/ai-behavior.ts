@@ -632,6 +632,22 @@ function b16_positionalImprovement(state: GameState): CandidateMove | null {
     return null;
 }
 
+/** B18: Panic Fallback (Priority 0, Chance 1.0) */
+function b18_panicFallback(state: GameState): CandidateMove | null {
+    const { board, boardSize: size } = state;
+    // Last ditch effort: pick the first empty cell available.
+    // This ensures we ALMOST never fall through to the expensive minimax on large boards
+    // if every other strategic behavior was filtered out by risk/chance.
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (isEmptyCell(board, r, c)) {
+                return { r, c, effect: null };
+            }
+        }
+    }
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Default Behavior Configuration
 // ---------------------------------------------------------------------------
@@ -652,6 +668,7 @@ export const DEFAULT_BEHAVIOR_CONFIG: BehaviorConfig[] = [
     { priority: 40, triggerChance: 0.6, name: 'Place NPC Empathy', generate: b13_npcEmpathy },
     { priority: 35, triggerChance: 0.5, name: 'Break Player Structure', generate: b14_breakPlayerStructure },
     { priority: 10, triggerChance: 1.0, name: 'Positional Improvement', generate: b16_positionalImprovement },
+    { priority: 0, triggerChance: 1.0, name: 'Panic Fallback', generate: b18_panicFallback },
 ];
 
 // ---------------------------------------------------------------------------
