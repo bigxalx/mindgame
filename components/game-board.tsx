@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GameState, Player, SpecialEffect, Cell } from "@/types/game";
+import { GameState, Player, SpecialEffect, Cell, Board } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Zap, Heart, Target, Loader2, Sparkles } from "lucide-react";
@@ -12,12 +12,24 @@ interface Props {
     state: GameState;
     role: Player | 'spectator' | null;
     onMove: (r: number, c: number, effect: SpecialEffect | null) => void;
+    onUndo: () => void;
+    onConfirm: () => void;
     onSwap: (r1: number, c1: number, r2: number, c2: number) => void;
-    onEndTurn: () => void;
-    isAiMode: boolean;
+    onActionTypeChange: (type: 'move' | 'swap') => void;
+    onRestart: () => void;
 }
 
-export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: Props) {
+// Helper to check influence for dots
+function isCellUnderInfluence(board: Board, r: number, c: number, effect: string): boolean {
+    const size = board.length;
+    const neighbors = getNeighbors(r, c, size);
+
+    // For specific dots, we check if ANY neighbor has the active effect
+    // (Ignoring neutralization for the dots to show potential range)
+    return neighbors.some(n => board[n.r][n.c].effects.includes(effect as any));
+}
+
+export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onActionTypeChange, onRestart }: Props) {
     const [selectedEffect, setSelectedEffect] = useState<SpecialEffect | null>(null);
     const [hovering, setHovering] = useState<{ r: number; c: number } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -63,7 +75,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
     // AI Turn Lifecycle
     useEffect(() => {
         // AI ACTS IF: It's an AI game AND it is White's turn AND game isn't over AND not already processing
-        const needsToAct = (isAiMode || state.isAiGame) && state.turn === 'white';
+        const needsToAct = (state.isAiGame) && state.turn === 'white';
 
         if (!needsToAct || state.gameOver || isProcessing) return;
 
@@ -81,7 +93,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                         await onMove(aiDecision.r, aiDecision.c, aiDecision.effect);
                     } else {
                         console.log("AI Phase 1: No valid moves, ending turn.");
-                        onEndTurn();
+                        onConfirm(); // Changed from onEndTurn to onConfirm
                     }
                     setIsProcessing(false);
                     return;
@@ -105,7 +117,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                     setIsProcessing(true);
                     console.log("AI Phase 3: Committing turn...");
                     await new Promise(r => setTimeout(r, 500)); // Finish delay
-                    onEndTurn();
+                    onConfirm(); // Changed from onEndTurn to onConfirm
                     setIsProcessing(false);
                 }
             } catch (error) {
@@ -115,7 +127,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
         }, 600);
 
         return () => clearTimeout(timer);
-    }, [state.turn, isAiMode, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap]);
+    }, [state.turn, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap, onMove, onSwap, onConfirm]);
 
     const effectsList: { id: SpecialEffect; icon: any; color: string; glow: string; label: string; desc: string }[] = [
         { id: 'empathy', icon: Heart, color: 'text-green-400', glow: 'shadow-[0_0_15px_rgba(74,222,128,0.5)]', label: 'Empathy', desc: 'Converts adjacent neutral stones at turn start.' },
@@ -124,7 +136,9 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
         { id: 'manipulation', icon: Zap, color: 'text-purple-400', glow: 'shadow-[0_0_15px_rgba(192,132,252,0.5)]', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
     ];
 
-    const currentInventory = role === 'spectator' ? { aggression: 0, manipulation: 0, control: 0, empathy: 0 } : state.inventory[role || state.turn];
+    const currentInventory = (role === 'black' || role === 'white')
+        ? state.inventory[role]
+        : { empathy: 0, control: 0, aggression: 0, manipulation: 0 } as Record<SpecialEffect, number>;
 
     const getAffectedCells = (r: number, c: number, effect: SpecialEffect | null) => {
         if (!effect) return [];
@@ -223,25 +237,23 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                     padding: '8%',
                 }}
             >
-                {/* 1. Cosmic Depth & Denser Neural Fog Layers */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(20,15,45,1)_0%,rgba(2,2,8,1)_100%)]" />
+                {/* 1. Universal Cosmic Depth */}
+                <div className="fixed inset-0 bg-[#020208] z-[-2]" />
 
-                {/* High-Intensity Brain Fog */}
+                {/* Layered Neural Fog (Fixing Visibility & Scale) */}
                 <motion.div
-                    animate={{ x: [0, 80, 0], y: [0, 40, 0], opacity: [0.15, 0.35, 0.15], scale: [1, 1.2, 1] }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    className="absolute top-[-20%] left-[-20%] w-[140%] h-[140%] bg-[radial-gradient(circle,rgba(80,50,150,0.25)_0%,transparent_70%)] blur-[100px] z-0"
+                    animate={{ scale: [1, 1.15, 1], rotate: [0, 5, 0], opacity: [0.3, 0.5, 0.3] }}
+                    transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_30%_30%,rgba(60,40,120,0.4)_0%,transparent_50%)] blur-[80px] z-[-1]"
                 />
                 <motion.div
-                    animate={{ x: [0, -60, 0], y: [0, 70, 0], opacity: [0.1, 0.25, 0.1], scale: [1.2, 1, 1.2] }}
-                    transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                    className="absolute bottom-[-30%] right-[-20%] w-[150%] h-[150%] bg-[radial-gradient(circle,rgba(50,80,180,0.2)_0%,transparent_70%)] blur-[120px] z-0"
+                    animate={{ scale: [1.1, 1, 1.1], rotate: [0, -5, 0], opacity: [0.2, 0.4, 0.2] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_70%_70%,rgba(40,60,150,0.3)_0%,transparent_50%)] blur-[100px] z-[-1]"
                 />
-                <motion.div
-                    animate={{ opacity: [0.05, 0.15, 0.05] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-0 bg-[#0a0a1a]/30 z-0"
-                />
+
+                {/* Vignette for Focus */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.8)_100%)] z-0 pointer-events-none" />
 
                 {/* Random Synapse Flashes Layer */}
                 <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
@@ -342,6 +354,27 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                         className="absolute w-1.5 h-1.5 rounded-full bg-[#fce7d5]/60 blur-[0.5px] z-0 shadow-[0_0_10px_rgba(252,231,213,0.5)]"
                                     />
 
+                                    {/* Cognitive Influence Markers (Small Dots) */}
+                                    <div className="absolute inset-x-0 bottom-1 flex items-center justify-center pointer-events-none z-40">
+                                        <div className="flex gap-1 px-1 py-0.5 rounded-full bg-black/20 backdrop-blur-[2px]">
+                                            {/* Empathy Influence (Green) - Only on Neutral Pieces or Empty */}
+                                            {((cell.type === 'black' || cell.type === 'white') && cell.effects.length === 0 || cell.type === 'empty') &&
+                                                isCellUnderInfluence(state.board, r, c, 'empathy') && (
+                                                    <motion.div
+                                                        initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                                        className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                                                    />
+                                                )}
+                                            {/* Control Influence (Blue) */}
+                                            {isCellUnderInfluence(state.board, r, c, 'control') && (
+                                                <motion.div
+                                                    initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                                    className="w-1 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.8)]"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* Occult Stone (The Soul & Aura System) */}
                                     <AnimatePresence mode="popLayout">
                                         {cell.type !== 'empty' && (
@@ -351,36 +384,38 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                                 animate={{ scale: 1, opacity: 1 }}
                                                 exit={{ scale: 0, opacity: 0 }}
                                                 className={cn(
-                                                    "w-[75%] h-[75%] rounded-full z-10 shadow-2xl relative transition-all duration-500",
-                                                    "border border-white/20 backdrop-blur-md overflow-hidden",
+                                                    "w-[62%] h-[62%] rounded-full z-10 shadow-2xl relative transition-all duration-500",
+                                                    "border border-white/10 backdrop-blur-md overflow-hidden",
                                                     cell.type === 'black' && "bg-black",
-                                                    (cell.type === 'white' || cell.type === 'resistance') && "bg-white",
-                                                    // Massive Edge Glows (50% Shape Aura)
-                                                    cell.type === 'resistance' && "ring-[8px] ring-amber-500/80 shadow-[0_0_40px_rgba(245,158,11,0.6)]",
-                                                    cell.effects.includes('empathy') && "ring-[8px] ring-emerald-400/80 shadow-[0_0_40px_rgba(52,211,153,0.6)]",
-                                                    cell.effects.includes('control') && "ring-[8px] ring-blue-400/80 shadow-[0_0_40px_rgba(96,165,250,0.6)]",
-                                                    cell.effects.includes('aggression') && "ring-[8px] ring-rose-500/80 shadow-[0_0_40px_rgba(244,63,94,0.6)]",
-                                                    cell.effects.includes('manipulation') && "ring-[8px] ring-purple-400/80 shadow-[0_0_40px_rgba(192,132,252,0.6)]",
-                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-[10px] ring-white shadow-[0_0_50px_white] scale-110"
+                                                    cell.type === 'white' && "bg-white",
+                                                    cell.type === 'resistance' && "bg-yellow-400 border-none shadow-[0_0_20px_rgba(250,204,21,0.4)]",
+                                                    // Interior Aura Rings (50% Mass)
+                                                    cell.effects.includes('empathy') && "ring-[10px] ring-inset ring-emerald-500/40",
+                                                    cell.effects.includes('control') && "ring-[10px] ring-inset ring-blue-500/40",
+                                                    cell.effects.includes('aggression') && "ring-[10px] ring-inset ring-rose-500/40",
+                                                    cell.effects.includes('manipulation') && "ring-[10px] ring-inset ring-purple-500/40",
+                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-[4px] ring-white scale-110 shadow-[0_0_30px_rgba(255,255,255,0.8)]"
                                                 )}
                                             >
                                                 {/* Specialized Light Hearts */}
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                                                     {cell.type === 'black' ? (
-                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-indigo-500/40 via-purple-600/20 to-transparent blur-[4px] animate-pulse" />
+                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-purple-500/40 via-indigo-600/20 to-transparent blur-[4px] animate-pulse" />
+                                                    ) : cell.type === 'resistance' ? (
+                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-yellow-100/40 to-transparent blur-[4px] animate-pulse" />
                                                     ) : (
                                                         <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-blue-100/40 to-transparent blur-[3px] animate-pulse" />
                                                     )}
 
                                                     {/* The Concentrated Light Spark */}
                                                     <div className={cn(
-                                                        "w-1.5 h-1.5 rounded-full blur-[0.5px] shadow-[0_0_10px_rgba(255,255,255,0.8)]",
-                                                        cell.type === 'black' ? "bg-indigo-200" : "bg-white"
+                                                        "w-1.5 h-1.5 rounded-full blur-[0.3px] shadow-[0_0_10px_rgba(255,255,255,0.8)]",
+                                                        cell.type === 'black' ? "bg-purple-200" : "bg-white"
                                                     )} />
                                                 </div>
 
-                                                {/* Deep Inset Shadows for 50/50 Look */}
-                                                <div className="absolute inset-0 rounded-full shadow-[inset_0_0_25px_rgba(0,0,0,0.8)] z-10" />
+                                                {/* Depth Insets */}
+                                                <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.1),inset_0_-2px_10px_rgba(0,0,0,0.5)] z-10" />
 
                                                 {/* Environmental Polished Sheen */}
                                                 <div className="absolute inset-[-2px] bottom-1/2 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none z-30" />
