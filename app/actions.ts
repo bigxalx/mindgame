@@ -1,18 +1,84 @@
 "use server";
 
 import { createGame, getGame, saveGame } from "@/lib/storage";
-import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
-import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized } from "@/lib/game";
+import { GameState, Player, Board, SpecialEffect, AIDifficulty, StoneType, Inventory } from "@/types/game";
+import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized, handleResolutionEvent } from "@/lib/game";
 
-function checkWin(board: Board, currentPlayer: Player): { gameOver: boolean; winner: Player | null } {
+// ---------------------------------------------------------------------------
+// Difficulty Configuration
+// ---------------------------------------------------------------------------
+
+/** Shuffle an array in place (Fisher-Yates) and return it. */
+function shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/**
+ * Returns the full configuration for a given difficulty:
+ * - boardSize: grid dimensions
+ * - numResistance: starting resistance stones
+ * - roundLimit: max full Black turns before white wins (if resistance remains)
+ * - npcEffectTypes: which special effects the NPC is allowed to use
+ * - npcMaxSpecial: total special stones to distribute across npcEffectTypes
+ */
+function getDifficultyConfig(difficulty: AIDifficulty) {
+    const allEffects: SpecialEffect[] = ['aggression', 'manipulation', 'control', 'empathy'];
+    const randomTypes = (n: number) => shuffle(allEffects).slice(0, n);
+
+    switch (difficulty) {
+        case 'easy':
+            return { boardSize: 5, numResistance: 2, roundLimit: 12, npcEffectTypes: [] as SpecialEffect[], npcMaxSpecial: 0 };
+        case 'medium':
+            return { boardSize: 5, numResistance: 2, roundLimit: 12, npcEffectTypes: randomTypes(1), npcMaxSpecial: 3 };
+        case 'hard':
+            return { boardSize: 6, numResistance: 3, roundLimit: 16, npcEffectTypes: randomTypes(2), npcMaxSpecial: 5 };
+        case 'expert':
+            return { boardSize: 7, numResistance: 3, roundLimit: 20, npcEffectTypes: randomTypes(3), npcMaxSpecial: 5 };
+        default: // impossible / fallback — no constraint set here yet
+            return { boardSize: 7, numResistance: 3, roundLimit: 20, npcEffectTypes: randomTypes(3), npcMaxSpecial: 5 };
+    }
+}
+
+/**
+ * Builds the NPC's starting inventory.
+ * Distributes maxTotal stones as evenly as possible across the given effect types.
+ */
+function buildNpcInventory(types: SpecialEffect[], maxTotal: number): Inventory {
+    const inv: Inventory = { aggression: 0, manipulation: 0, control: 0, empathy: 0 };
+    if (types.length === 0 || maxTotal === 0) return inv;
+    const perType = Math.floor(maxTotal / types.length);
+    const extra = maxTotal % types.length;
+    types.forEach((t, i) => {
+        inv[t] = perType + (i < extra ? 1 : 0);
+    });
+    // A lone aggression stone can never trigger its effect (needs a pair).
+    // If aggression was assigned exactly 1, bump it to the minimum usable count of 2.
+    if (inv.aggression === 1) {
+        inv.aggression = 2;
+    }
+    return inv;
+}
+
+
+function checkWin(board: Board, currentPlayer: Player, turnCount: number = 0): { gameOver: boolean; winner: Player | null } {
     let resistanceFound = false;
     let emptyCells = false;
+    let blackCount = 0;
+    let whiteCount = 0;
+
     const size = board.length;
 
     for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
             if (board[r][c].type === 'resistance') resistanceFound = true;
             if (board[r][c].type === 'empty') emptyCells = true;
+            if (board[r][c].type === 'black') blackCount++;
+            if (board[r][c].type === 'white' || board[r][c].type === 'resistance') whiteCount++;
         }
     }
 
@@ -22,36 +88,62 @@ function checkWin(board: Board, currentPlayer: Player): { gameOver: boolean; win
     }
 
     // NPC (White) wins if Player (Black) has no legal placements (empty cells)
-    // Rule: "NPC wins if: Player has no legal placements available"
     if (!emptyCells && currentPlayer === 'black') {
         return { gameOver: true, winner: 'white' };
+    }
+
+    // Total Annihilation (Active after Round 1, i.e., turnCount > 1)
+    if (turnCount > 1) {
+        if (blackCount === 0) return { gameOver: true, winner: 'white' };
+        if (whiteCount === 0) return { gameOver: true, winner: 'black' };
     }
 
     return { gameOver: false, winner: null };
 }
 
+/**
+ * Creates a new game, using difficulty settings to configure board, resistance,
+ * NPC inventory, and turn limit.  `size` is ignored for AI games; the difficulty
+ * config determines the board dimensions.
+ */
 export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const initialInventory = {
-        aggression: 2,
-        manipulation: 1,
-        control: 1,
-        empathy: 1
-    };
+
+    // Player gets the full standard inventory (no limitations for now)
+    const playerInventory: Inventory = { aggression: 2, manipulation: 1, control: 1, empathy: 1 };
+
+    let boardSize = size;
+    let numResistance = 2;
+    let turnLimit: number | undefined;
+    let npcEffectTypes: SpecialEffect[] | undefined;
+    let npcInventory: Inventory = { ...playerInventory };
+
+    if (isAiGame && difficulty) {
+        const cfg = getDifficultyConfig(difficulty);
+        boardSize = cfg.boardSize;
+        numResistance = cfg.numResistance;
+        turnLimit = cfg.roundLimit;
+        npcEffectTypes = cfg.npcEffectTypes;
+        npcInventory = buildNpcInventory(cfg.npcEffectTypes, cfg.npcMaxSpecial);
+    }
+
     const initialState: GameState = {
-        board: createInitialBoard(size),
-        turn: 'black', // Black starts
+        board: createInitialBoard(boardSize, numResistance),
+        turn: 'black',
         history: [],
         gameOver: false,
         winner: null,
-        boardSize: size,
+        boardSize,
         moveConfirmed: false,
         inventory: {
-            black: { ...initialInventory },
-            white: { ...initialInventory }
+            black: { ...playerInventory },
+            white: { ...npcInventory },
         },
         isAiGame,
-        difficulty
+        difficulty,
+        turnCount: 0,
+        ...(turnLimit !== undefined && { turnLimit }),
+        ...(npcEffectTypes !== undefined && { npcEffectTypes }),
     };
 
     await createGame(gameId, initialState);
@@ -76,15 +168,26 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
     const player = state.turn;
     const newInventory = JSON.parse(JSON.stringify(state.inventory));
 
-    // Place stone
-    if (effect) {
-        if (newInventory[player][effect] > 0) {
-            newBoard[r][c].effects.push(effect);
-            newInventory[player][effect]--;
+    // Aftershock check: Opposing player blocked for 1 turn cycle
+    if (newBoard[r][c].aftershock) {
+        const { type, turnCreated } = newBoard[r][c].aftershock;
+        // aftershock.type = victim's player color.
+        // block the VICTIM'S TEAM from reclaiming (same side as the destroyed stone).
+        if (state.turnCount - turnCreated < 2 && type === player) {
+            return null;
         }
     }
 
+    // Place stone
+    if (effect) {
+        // Server-side guard: reject if the player doesn't own this effect
+        if (newInventory[player][effect] <= 0) return null;
+        newBoard[r][c].effects.push(effect);
+        newInventory[player][effect]--;
+    }
+
     newBoard[r][c].type = player;
+    delete newBoard[r][c].aftershock; // Clear aftershock so it isn't a liberty
 
     // Apply immediate effect (Aggression/Manipulation)
     // Control is now dynamic via isNeutralized helper
@@ -93,8 +196,7 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
     // Aggression and captures are delayed until commitTurn
 
     const isManipulation = effect === 'manipulation' &&
-        newBoard[r][c].effects.includes('manipulation') &&
-        !isNeutralized(newBoard, r, c);
+        newBoard[r][c].effects.includes('manipulation');
 
     const newState: GameState = {
         ...state,
@@ -106,7 +208,12 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
     };
 
     // Check for win
-    const winStatus = checkWin(newBoard, player);
+    const winStatus = checkWin(newBoard, player, state.turnCount); // Pass turnCount for Annihilation check?
+    // Wait, state.turnCount is 0 at start. After round 1 means turnCount >= 2.
+    // We can pass current state.turnCount. 
+    // Actually, immediate win checks in makeMove are usually for simple conditions.
+    // Annihilation is better checked in commitTurn after all destructions.
+
     if (winStatus.gameOver) {
         newState.gameOver = true;
         newState.winner = winStatus.winner;
@@ -125,15 +232,19 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
 
     let newBoard = JSON.parse(JSON.stringify(state.board)) as Board;
 
-    // Swap stones
+    // Swap ONLY stone types — effects stay on their original cells.
+    // This prevents Manipulation from "traveling" to a new position.
     const tempType = newBoard[r1][c1].type;
-    const tempEffects = [...newBoard[r1][c1].effects];
-
     newBoard[r1][c1].type = newBoard[r2][c2].type;
-    newBoard[r1][c1].effects = [...newBoard[r2][c2].effects];
-
     newBoard[r2][c2].type = tempType;
-    newBoard[r2][c2].effects = tempEffects;
+
+    // Consume the Manipulation effect (it's been used)
+    newBoard[r1][c1].effects = newBoard[r1][c1].effects.filter(e => e !== 'manipulation');
+    newBoard[r2][c2].effects = newBoard[r2][c2].effects.filter(e => e !== 'manipulation');
+
+    // Clear aftershock from both cells involved in the swap
+    delete newBoard[r1][c1].aftershock;
+    delete newBoard[r2][c2].aftershock;
 
     // NO DESTRUCTIVE EFFECTS UNTIL COMMIT
     // (Aggression/Captures handled in commitTurn)
@@ -145,7 +256,7 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
         pendingSwap: undefined, // Swap done
     };
 
-    const winStatus = checkWin(newBoard, state.turn);
+    const winStatus = checkWin(newBoard, state.turn, state.turnCount);
     if (winStatus.gameOver) {
         newState.gameOver = true;
         newState.winner = winStatus.winner;
@@ -182,20 +293,24 @@ export async function commitTurn(gameId: string) {
     let gameOver = false;
     let winner: Player | null = null;
 
-    if (!checkWin(newBoard, state.turn).gameOver) {
-        // 1. Resolve Placement Effects (Aggression from the stone placed this turn)
-        // Find the stone placed this turn by comparing board with history? 
-        // Or simply iterate all aggression stones and trigger them.
+    if (!checkWin(newBoard, state.turn, state.turnCount).gameOver) {
+        const allDestroyed: { r: number; c: number; type: StoneType }[] = [];
+
+        // 1. Resolve Placement Effects (Aggression)
         for (let r = 0; r < newBoard.length; r++) {
             for (let c = 0; c < newBoard.length; c++) {
                 if (newBoard[r][c].effects.includes('aggression')) {
-                    newBoard = triggerAggression(newBoard, { r, c });
+                    const result = triggerAggression(newBoard, { r, c });
+                    newBoard = result.board;
+                    allDestroyed.push(...result.destroyed);
                 }
             }
         }
 
-        // 2. Resolve initial captures (Suicide/Normal)
-        newBoard = checkCaptures(newBoard, state.turn);
+        // 2. Resolve initial captures
+        const cap1 = checkCaptures(newBoard, state.turn);
+        newBoard = cap1.board;
+        allDestroyed.push(...cap1.destroyed);
 
         // 3. Resolve spreading effects
         newBoard = spreadEmpathy(newBoard, nextPlayer);
@@ -205,15 +320,47 @@ export async function commitTurn(gameId: string) {
             newBoard = result.board;
         }
 
-        // 4. Resolve captures that may have resulted from spreading
-        newBoard = checkCaptures(newBoard, nextPlayer);
+        // 4. Resolve captures from spreading
+        const cap2 = checkCaptures(newBoard, nextPlayer);
+        newBoard = cap2.board;
+        allDestroyed.push(...cap2.destroyed);
 
-        // 5. Final win check for the start of the next player's turn
-        const finalWinStatus = checkWin(newBoard, nextPlayer);
+        // 5. Finalize Destruction Event (Collapse/Aftershock)
+        newBoard = handleResolutionEvent(newBoard, allDestroyed, state.turn, state.turnCount);
+
+        // CLEANUP: Remove expired Aftershocks
+        for (let r = 0; r < newBoard.length; r++) {
+            for (let c = 0; c < newBoard.length; c++) {
+                if (newBoard[r][c].aftershock) {
+                    // diff >= 2 means a full round cycle has passed
+                    if (state.turnCount - newBoard[r][c].aftershock!.turnCreated >= 2) {
+                        delete newBoard[r][c].aftershock;
+                    }
+                }
+            }
+        }
+
+        // 6. Final win check
+        const finalWinStatus = checkWin(newBoard, nextPlayer, state.turnCount + 1);
         gameOver = finalWinStatus.gameOver;
         winner = finalWinStatus.winner;
+
+        // 7. Turn limit check (AI games only) — runs ONLY when Black just committed
+        if (!gameOver && state.turn === 'black' && state.turnLimit !== undefined) {
+            const blackTurnsDone = Math.ceil((state.turnCount + 1) / 2);
+            if (blackTurnsDone >= state.turnLimit) {
+                // Turn limit reached — if resistance still exists, white (NPC) wins
+                const resistanceRemains = newBoard.some(row =>
+                    row.some(cell => cell.type === 'resistance')
+                );
+                if (resistanceRemains) {
+                    gameOver = true;
+                    winner = 'white';
+                }
+            }
+        }
     } else {
-        const winStatus = checkWin(newBoard, state.turn);
+        const winStatus = checkWin(newBoard, state.turn, state.turnCount);
         gameOver = winStatus.gameOver;
         winner = winStatus.winner;
     }
@@ -224,9 +371,9 @@ export async function commitTurn(gameId: string) {
         turn: nextPlayer,
         moveConfirmed: false,
         pendingSwap: undefined,
-        history: [], // Clear history for new turn
         gameOver,
         winner,
+        turnCount: state.turnCount + 1,
     };
 
     await saveGame(gameId, newState);
@@ -234,5 +381,6 @@ export async function commitTurn(gameId: string) {
 }
 
 export async function pollGame(gameId: string) {
-    return await getGame(gameId);
+    const game = await getGame(gameId);
+    return game;
 }

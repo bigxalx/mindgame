@@ -1,4 +1,4 @@
-export type StoneType = 'black' | 'white' | 'resistance' | 'empty';
+export type StoneType = 'black' | 'white' | 'resistance' | 'empty' | 'collapse';
 export type SpecialEffect = 'empathy' | 'control' | 'aggression' | 'manipulation';
 export type AIDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'impossible';
 
@@ -6,6 +6,7 @@ export interface Cell {
     type: StoneType;
     effects: SpecialEffect[];
     id: string; // unique ID for transitions
+    aftershock?: { type: Player; turnCreated: number };
 }
 
 export type Board = Cell[][];
@@ -30,4 +31,7 @@ export interface GameState {
         type: 'move' | 'swap' | 'capture' | 'spread';
         cells: { r: number; c: number }[];
     };
+    turnCount: number;
+    turnLimit?: number;        // Max full Black turns before white wins (if resistance remains)
+    npcEffectTypes?: SpecialEffect[]; // Which effect types the NPC was assigned at game creation
 }

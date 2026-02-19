@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GameState, Player, SpecialEffect, Cell, Board, Inventory } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,6 +47,18 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
     const [hovering, setHovering] = useState<{ r: number; c: number } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [swapSelection, setSwapSelection] = useState<{ r: number; c: number } | null>(null);
+    const [aiPlannedSwap, setAiPlannedSwap] = useState<{ r1: number; c1: number; r2: number; c2: number } | null>(null);
+
+    // Stable filament positions — computed once to avoid hydration mismatch
+    const filamentStyles = useMemo(() =>
+        Array.from({ length: 12 }, () => ({
+            top: `${Math.random() * 100}%`,
+            left: '-20%',
+            width: '140%',
+            transform: `rotate(${Math.random() * 360}deg)`,
+            filter: 'blur(1px)',
+        })),
+        []);
 
     const canMove = state.turn === role && !state.gameOver && !isProcessing;
     const isSwapMode = state.pendingSwap !== undefined;
@@ -55,24 +67,42 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
         if (!canMove) return;
 
         if (isSwapMode) {
+            const swapOrigin = state.pendingSwap!;
+
             if (!swapSelection) {
-                // Can only pick the opportunity stone or adjacent ones
-                const dist = Math.abs(r - state.pendingSwap!.r) + Math.abs(c - state.pendingSwap!.c);
-                if (dist <= 1) {
-                    setSwapSelection({ r, c });
-                } else {
-                    toast.error("Can only swap adjacent to Manipulation stone");
+                // First click: must be the Manipulation stone itself OR an adjacent stone
+                const distFromOrigin = Math.abs(r - swapOrigin.r) + Math.abs(c - swapOrigin.c);
+                if (distFromOrigin > 1) {
+                    toast.error("Can only select stones adjacent to the Manipulation stone");
+                    return;
                 }
+                const targetCell = state.board[r][c];
+                if (targetCell.type === 'empty' || targetCell.type === 'collapse') {
+                    toast.error("Manipulation target must contain a stone");
+                    return;
+                }
+                setSwapSelection({ r, c });
             } else {
-                const dist = Math.abs(r - swapSelection.r) + Math.abs(c - swapSelection.c);
-                if (dist === 1 || (r === swapSelection.r && c === swapSelection.c)) {
-                    setIsProcessing(true);
-                    await onSwap(swapSelection.r, swapSelection.c, r, c);
-                    setSwapSelection(null);
-                    setIsProcessing(false);
-                } else {
-                    toast.error("Stones must be adjacent to swap");
+                // Second click: must ALSO be adjacent to the Manipulation origin (not the first selection)
+                const distFromOrigin = Math.abs(r - swapOrigin.r) + Math.abs(c - swapOrigin.c);
+                if (distFromOrigin > 1) {
+                    toast.error("Both stones must be adjacent to the Manipulation stone");
+                    return;
                 }
+                if (r === swapSelection.r && c === swapSelection.c) {
+                    // Deselect
+                    setSwapSelection(null);
+                    return;
+                }
+                const targetCell = state.board[r][c];
+                if (targetCell.type === 'empty' || targetCell.type === 'collapse') {
+                    toast.error("Swap target must contain a stone");
+                    return;
+                }
+                setIsProcessing(true);
+                await onSwap(swapSelection.r, swapSelection.c, r, c);
+                setSwapSelection(null);
+                setIsProcessing(false);
             }
             return;
         }
@@ -103,10 +133,14 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                     const aiDecision = getAIDecision(state, state.difficulty || 'medium');
                     if (aiDecision) {
                         console.log("AI Phase 1: Placing stone at", aiDecision);
+                        if (aiDecision.swap) {
+                            console.log("AI Phase 1: Planning swap for later:", aiDecision.swap);
+                            setAiPlannedSwap(aiDecision.swap);
+                        }
                         await onMove(aiDecision.r, aiDecision.c, aiDecision.effect);
                     } else {
                         console.log("AI Phase 1: No valid moves, ending turn.");
-                        onConfirm(); // Changed from onEndTurn to onConfirm
+                        onConfirm();
                     }
                     setIsProcessing(false);
                     return;
@@ -118,9 +152,26 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                     console.log("AI Phase 2: Handling swap at", state.pendingSwap);
                     await new Promise(r => setTimeout(r, 600)); // Swap delay
                     const { r, c } = state.pendingSwap;
-                    const neighbors = getNeighbors(r, c, state.boardSize);
-                    const target = neighbors[Math.floor(Math.random() * neighbors.length)];
-                    await onSwap(r, c, target.r, target.c);
+
+                    let targetR, targetC;
+                    if (aiPlannedSwap && ((aiPlannedSwap.r1 === r && aiPlannedSwap.c1 === c) || (aiPlannedSwap.r2 === r && aiPlannedSwap.c2 === c))) {
+                        // Use the strategically planned target
+                        // Determine which endpoint of the planned swap is NOT the pendingSwap position
+                        const useSecond = aiPlannedSwap.r1 === r && aiPlannedSwap.c1 === c;
+                        targetR = useSecond ? aiPlannedSwap.r2 : aiPlannedSwap.r1;
+                        targetC = useSecond ? aiPlannedSwap.c2 : aiPlannedSwap.c1;
+                        console.log("AI Phase 2: Executing STRATEGIC swap with", targetR, targetC);
+                    } else {
+                        // Fallback to random if no plan matches
+                        const neighbors = getNeighbors(r, c, state.boardSize);
+                        const target = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        targetR = target.r;
+                        targetC = target.c;
+                        console.log("AI Phase 2: Executing RANDOM fallback swap with", targetR, targetC);
+                    }
+
+                    await onSwap(r, c, targetR, targetC);
+                    setAiPlannedSwap(null);
                     setIsProcessing(false);
                     return;
                 }
@@ -156,11 +207,7 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
     const getAffectedCells = (r: number, c: number, effect: SpecialEffect | null) => {
         if (!effect) return [];
         const size = state.boardSize;
-        const neighbors = [];
-        if (r > 0) neighbors.push({ r: r - 1, c });
-        if (r < size - 1) neighbors.push({ r: r + 1, c });
-        if (c > 0) neighbors.push({ r, c: c - 1 });
-        if (c < size - 1) neighbors.push({ r, c: c + 1 });
+        const neighbors = getNeighbors(r, c, size);
 
         if (effect === 'empathy' || effect === 'control' || effect === 'manipulation') {
             return neighbors.filter(n => state.board[n.r][n.c].type !== 'empty');
@@ -174,7 +221,8 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                 let currC = c + dc;
                 const path = [];
                 while (currR >= 0 && currR < size && currC >= 0 && currC < size) {
-                    if (state.board[currR][currC].type === 'empty') break;
+                    const t = state.board[currR][currC].type;
+                    if (t === 'empty' || t === 'collapse') break;
                     if (state.board[currR][currC].effects.includes('aggression')) {
                         affected.push(...path);
                         break;
@@ -241,88 +289,103 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                 </AnimatePresence>
             </div>
 
+            {/* Turn Limit Countdown (AI games only) */}
+            {state.turnLimit !== undefined && !state.gameOver && (
+                (() => {
+                    const blackTurnsDone = Math.ceil(state.turnCount / 2); // full black turns done so far
+                    const remaining = state.turnLimit - blackTurnsDone;
+                    const urgency = remaining <= 3 ? 'red' : remaining <= 6 ? 'amber' : 'blue';
+                    const pct = Math.max(0, remaining / state.turnLimit) * 100;
+                    return (
+                        <div className="w-full max-w-md space-y-1">
+                            <div className="flex justify-between items-center px-1">
+                                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Turns Remaining</p>
+                                <p className={cn(
+                                    "text-sm font-black tabular-nums",
+                                    urgency === 'red' && "text-red-400 animate-pulse",
+                                    urgency === 'amber' && "text-amber-400",
+                                    urgency === 'blue' && "text-slate-300",
+                                )}>{remaining} / {state.turnLimit}</p>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                                <div
+                                    className={cn(
+                                        "h-full rounded-full transition-all duration-700",
+                                        urgency === 'red' && "bg-red-500",
+                                        urgency === 'amber' && "bg-amber-400",
+                                        urgency === 'blue' && "bg-blue-500",
+                                    )}
+                                    style={{ width: `${pct}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })()
+            )}
+
             {/* Board Wrapper (Hypnotic Neural Synapse Background) */}
             <div
-                className="relative rounded-[2.5rem] shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden group border border-white/5 bg-transparent"
+                className="relative rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden group border border-white/5"
                 style={{
                     width: 'min(95vw, 750px)',
                     height: 'min(95vw, 750px)',
                     padding: '8%',
+                    backgroundColor: '#020205',
                 }}
             >
-                {/* 1. Base Universe / Synapse Image */}
+                {/* 1. Base Image - Subtile, Deep Space */}
                 <div
-                    className="absolute inset-0 z-[-10] bg-cover bg-center bg-no-repeat opacity-100"
+                    className="absolute inset-0 z-0 opacity-100 bg-center bg-no-repeat bg-cover"
                     style={{ backgroundImage: 'url(/synapse_bg.png)' }}
                 />
 
-                {/* 2. Advanced Neural Synapse Web (Deep Space Neural Web) */}
-                <div className="absolute inset-0 z-[-9] pointer-events-none overflow-hidden blur-[0.1px] opacity-80">
-                    {[...Array(12)].map((_, i) => (
+                {/* 2. Radiant Synapse Hubs (Dynamic Glowing Highlights) */}
+                <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+                    {[
+                        { t: '15%', l: '15%', c: 'rgba(56,189,248,0.5)' }, // Cyan Top Left
+                        { t: '15%', l: '85%', c: 'rgba(56,189,248,0.5)' }, // Cyan Top Right
+                        { t: '85%', l: '15%', c: 'rgba(56,189,248,0.5)' }, // Cyan Bottom Left
+                        { t: '85%', l: '85%', c: 'rgba(168,85,247,0.5)' }, // Purple Bottom Right
+                        { t: '50%', l: '10%', c: 'rgba(251,146,60,0.5)' }, // Orange Left
+                        { t: '50%', l: '90%', c: 'rgba(251,146,60,0.5)' }, // Orange Right
+                    ].map((hub, i) => (
+                        <motion.div
+                            key={`hub-${i}`}
+                            animate={{ opacity: [0.4, 0.9, 0.4], scale: [0.8, 1.2, 0.8] }}
+                            transition={{ duration: 4 + i, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute w-40 h-40 rounded-full blur-[40px]"
+                            style={{ top: hub.t, left: hub.l, background: hub.c, transform: 'translate(-50%, -50%)' }}
+                        />
+                    ))}
+                </div>
+
+                {/* 3. Cinematic Cosmic Fog (The Brain Fog) - High Contrast */}
+                <motion.div
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.6, 0.2] }}
+                    transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_30%_30%,rgba(139,92,246,0.5)_0%,transparent_60%)] blur-[100px] z-[2] mix-blend-screen"
+                />
+                <motion.div
+                    animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.5, 0.1] }}
+                    transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_70%_70%,rgba(79,70,229,0.4)_0%,transparent_60%)] blur-[120px] z-[3] mix-blend-screen"
+                />
+
+                {/* 4. Neural Filaments (Energy Lines) - stable positions via useMemo */}
+                <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden opacity-40">
+                    {filamentStyles.map((style, i) => (
                         <motion.div
                             key={`synapse-${i}`}
-                            animate={{
-                                opacity: [0.2, 0.6, 0.2],
-                                scale: [0.95, 1.05, 0.95],
-                            }}
-                            transition={{ duration: 12 + i * 2, repeat: Infinity, ease: "easeInOut" }}
-                            className="absolute"
-                            style={{
-                                top: `${Math.random() * 100}%`,
-                                left: `${Math.random() * 100}%`,
-                                width: `${400 + Math.random() * 600}px`,
-                                height: '1.5px',
-                                background: `linear-gradient(90deg, transparent, ${i % 3 === 0 ? '#fbbf24' : i % 3 === 1 ? '#6366f1' : '#ec4899'}, transparent)`,
-                                transform: `rotate(${Math.random() * 360}deg)`,
-                                filter: 'blur(1.5px)',
-                                boxShadow: `0 0 25px ${i % 3 === 0 ? 'rgba(251,191,36,0.5)' : i % 3 === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(236,72,153,0.5)'}`
-                            }}
+                            animate={{ opacity: [0.1, 0.6, 0.1], scale: [0.95, 1.05, 0.95] }}
+                            transition={{ duration: 10 + i * 2, repeat: Infinity }}
+                            className="absolute bg-gradient-to-r from-transparent via-white/20 to-transparent h-[1px]"
+                            style={style}
                         />
                     ))}
                 </div>
 
-                {/* 3. Celestial Fog Layers (Richer Colors) */}
-                <motion.div
-                    animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5], x: [-20, 20, -20] }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_20%_20%,rgba(60,60,250,0.6)_0%,transparent_50%)] blur-[70px] z-[-8]"
-                />
-                <motion.div
-                    animate={{ scale: [1.15, 1, 1.15], opacity: [0.4, 0.7, 0.4], x: [20, -20, 20] }}
-                    transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_80%_80%,rgba(180,50,220,0.5)_0%,transparent_50%)] blur-[80px] z-[-7]"
-                />
-
-                {/* 4. Softened Vignette for Focus */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_50%,rgba(0,0,0,0.85)_100%)] z-[-6] pointer-events-none" />
-
-                {/* Random Synapse Flashes Layer */}
-                <div className="absolute inset-0 z-[-5] opacity-50 pointer-events-none">
-                    {[...Array(10)].map((_, i) => (
-                        <motion.div
-                            key={`flash-${i}`}
-                            animate={{
-                                opacity: [0, 0.9, 0],
-                                scale: [0.8, 1.1, 0.8]
-                            }}
-                            transition={{
-                                duration: Math.random() * 3 + 1.5,
-                                repeat: Infinity,
-                                delay: Math.random() * 15,
-                                repeatDelay: Math.random() * 8
-                            }}
-                            className="absolute bg-indigo-300/60 blur-[1px] rounded-full"
-                            style={{
-                                width: '1.2px',
-                                height: `${Math.random() * 200 + 100}px`,
-                                top: `${Math.random() * 100}%`,
-                                left: `${Math.random() * 100}%`,
-                                transform: `rotate(${Math.random() * 360}deg)`,
-                                boxShadow: '0 0 20px rgba(165, 180, 252, 0.6)'
-                            }}
-                        />
-                    ))}
-                </div>
+                {/* 5. Vignette / Depth */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.85)_100%)] z-[5] pointer-events-none" />
 
                 {/* The Interactive Board (Centered Grid) */}
                 <div className="relative w-full h-full z-10">
@@ -377,24 +440,68 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                     onMouseLeave={() => setHovering(null)}
                                 >
                                     {/* High-Glow Organic Filaments (Grid Lines) */}
-                                    <div className={cn(
-                                        "absolute w-[2px] bg-white/30 shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-700 z-0",
-                                        r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
-                                        hovering?.c === c && "bg-white/60 shadow-[0_0_20px_rgba(255,255,255,0.4)] w-[3px]"
-                                    )}></div>
-                                    <div className={cn(
-                                        "absolute h-[2px] bg-white/30 shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-700 z-0",
-                                        c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
-                                        hovering?.r === r && "bg-white/60 shadow-[0_0_20px_rgba(255,255,255,0.4)] h-[3px]"
-                                    )}></div>
+                                    {cell.type !== 'collapse' && (
+                                        <>
+                                            <div className={cn(
+                                                "absolute w-[2px] bg-white/20 transition-all duration-700 z-0",
+                                                r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
+                                            )}></div>
+                                            <div className={cn(
+                                                "absolute h-[2px] bg-white/20 transition-all duration-700 z-0",
+                                                c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
+                                            )}></div>
 
-                                    {/* Synapse Nodes (Strong Glowing Intersections) */}
-                                    <div className="absolute w-3 h-3 rounded-full bg-white/10 blur-[2px] z-0" />
-                                    <motion.div
-                                        animate={{ opacity: [0.3, 0.7, 0.3], scale: [1, 1.4, 1] }}
-                                        transition={{ duration: 2.5, repeat: Infinity, delay: (r + c) * 0.15 }}
-                                        className="absolute w-1.5 h-1.5 rounded-full bg-[#fce7d5]/60 blur-[0.5px] z-0 shadow-[0_0_10px_rgba(252,231,213,0.5)]"
-                                    />
+                                            {/* Synapse Nodes (Organic Glowing Intersections) */}
+                                            <div className="absolute w-2 h-2 rounded-full bg-white/5 blur-[2px] z-0" />
+                                            <motion.div
+                                                animate={{ opacity: [0.2, 0.5, 0.2], scale: [0.8, 1.2, 0.8] }}
+                                                transition={{ duration: 3, repeat: Infinity, delay: (r + c) * 0.2 }}
+                                                className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/40 blur-[0.5px] z-0"
+                                            />
+                                        </>
+                                    )}
+
+                                    {/* Collapse Void Effect */}
+                                    {cell.type === 'collapse' && (
+                                        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+                                            <motion.div
+                                                animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
+                                                transition={{ duration: 4, repeat: Infinity }}
+                                                className="w-12 h-12 bg-[radial-gradient(circle,rgba(0,0,0,1)_0%,rgba(20,20,30,0.8)_40%,transparent_70%)] rounded-full blur-sm"
+                                            />
+                                            <div className="w-4 h-4 bg-black rounded-full shadow-[0_0_15px_rgba(0,0,0,1)]" />
+                                        </div>
+                                    )}
+
+                                    {/* Aftershock Pulse - High Voltage */}
+                                    {cell.aftershock && (state.turnCount - cell.aftershock.turnCreated < 2) && (
+                                        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                                            <motion.div
+                                                // Electric flicker effect
+                                                animate={{
+                                                    scale: [1, 1.2, 0.9, 1.1, 1],
+                                                    opacity: [0.6, 0.9, 0.5, 0.8, 0.6]
+                                                }}
+                                                transition={{
+                                                    duration: 0.2,
+                                                    repeat: Infinity,
+                                                    repeatType: "reverse"
+                                                }}
+                                                className={cn(
+                                                    "w-8 h-8 rounded-full blur-[4px] mix-blend-screen",
+                                                    cell.aftershock.type === 'black'
+                                                        ? "bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+                                                        : "bg-amber-300 shadow-[0_0_15px_rgba(252,211,77,0.8)]"
+                                                )}
+                                            />
+                                            <div className={cn(
+                                                "w-3 h-3 rounded-full border-2",
+                                                cell.aftershock.type === 'black'
+                                                    ? "bg-black border-cyan-400"
+                                                    : "bg-white border-amber-400"
+                                            )} />
+                                        </div>
+                                    )}
 
                                     {/* Cognitive Influence Markers (Centered Dots) */}
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
@@ -525,7 +632,16 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                 {state.winner === 'black' ? 'BLACK WINS' : 'WHITE WINS'}
                             </h2>
                             <p className="text-slate-400 mb-6 font-medium">
-                                {state.winner === 'black' ? 'All resistance stones captured.' : 'The virus could not be contained.'}
+                                {state.winner === 'black'
+                                    ? 'All resistance stones captured.'
+                                    : (() => {
+                                        const blackTurnsDone = Math.ceil(state.turnCount / 2);
+                                        const hitLimit = state.turnLimit !== undefined && blackTurnsDone >= state.turnLimit;
+                                        return hitLimit
+                                            ? `Turn limit reached. Resistance survived.`
+                                            : 'The virus could not be contained.';
+                                    })()
+                                }
                             </p>
                             <button
                                 onClick={() => window.location.reload()}
