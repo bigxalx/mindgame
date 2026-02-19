@@ -4,17 +4,30 @@ import { createGame, getGame, saveGame } from "@/lib/storage";
 import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
 import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized } from "@/lib/game";
 
-function checkWin(board: Board): { gameOver: boolean; winner: Player | null } {
+function checkWin(board: Board, currentPlayer: Player): { gameOver: boolean; winner: Player | null } {
     let resistanceFound = false;
-    for (const row of board) {
-        for (const cell of row) {
-            if (cell.type === 'resistance') resistanceFound = true;
+    let emptyCells = false;
+    const size = board.length;
+
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (board[r][c].type === 'resistance') resistanceFound = true;
+            if (board[r][c].type === 'empty') emptyCells = true;
         }
     }
-    return {
-        gameOver: !resistanceFound,
-        winner: !resistanceFound ? 'black' : null
-    };
+
+    // Player (Black) wins if all resistance is gone
+    if (!resistanceFound) {
+        return { gameOver: true, winner: 'black' };
+    }
+
+    // NPC (White) wins if Player (Black) has no legal placements (empty cells)
+    // Rule: "NPC wins if: Player has no legal placements available"
+    if (!emptyCells && currentPlayer === 'black') {
+        return { gameOver: true, winner: 'white' };
+    }
+
+    return { gameOver: false, winner: null };
 }
 
 export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
@@ -95,8 +108,8 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         pendingSwap: isManipulation ? { r, c } : undefined,
     };
 
-    // Check if black wins immediately upon capture
-    const winStatus = checkWin(newBoard);
+    // Check for win
+    const winStatus = checkWin(newBoard, player);
     if (winStatus.gameOver) {
         newState.gameOver = true;
         newState.winner = winStatus.winner;
@@ -125,9 +138,12 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
     newBoard[r2][c2].type = tempType;
     newBoard[r2][c2].effects = tempEffects;
 
-    // Re-trigger aggression stones nearby
+    // Re-trigger aggression stones nearby (Counts as movement)
+    // Aggression triggers when placed OR moved (Manipulation)
     newBoard = triggerAggression(newBoard, { r: r1, c: c1 });
     newBoard = triggerAggression(newBoard, { r: r2, c: c2 });
+
+    // Aftershock/Collapse would go here
 
     newBoard = checkCaptures(newBoard, state.turn);
 
@@ -138,7 +154,7 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
         pendingSwap: undefined, // Swap done
     };
 
-    const winStatus = checkWin(newBoard);
+    const winStatus = checkWin(newBoard, state.turn);
     if (winStatus.gameOver) {
         newState.gameOver = true;
         newState.winner = winStatus.winner;
@@ -171,7 +187,8 @@ export async function commitTurn(gameId: string) {
     let newBoard = JSON.parse(JSON.stringify(state.board)) as Board;
     const nextPlayer = state.turn === 'black' ? 'white' : 'black';
 
-    const winStatus = checkWin(newBoard);
+    // Current board check for state at end of move
+    const winStatus = checkWin(newBoard, state.turn);
 
     // START OF TURN LOGIC (Only if game is NOT over)
     if (!winStatus.gameOver) {

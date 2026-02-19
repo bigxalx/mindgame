@@ -161,8 +161,10 @@ export default function Home() {
           const newState = await swapMove(gameId, r1, c1, r2, c2);
           if (newState) setState(newState);
         }}
-        onEndTurn={handleEndTurn}
-        isAiMode={isAiMode}
+        onUndo={handleUndo}
+        onConfirm={handleEndTurn}
+        onActionTypeChange={() => { }} // Not currently used in page.tsx layout but required by props
+        onRestart={() => window.location.reload()}
       />
 
       <div className="w-full max-w-md space-y-4">

@@ -117,8 +117,7 @@ export const spreadResistance = (board: Board): { board: Board; changed: boolean
 export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     const size = board.length;
     const newBoard = JSON.parse(JSON.stringify(board)) as Board;
-    const visited = new Set<string>();
-    const toConvert: { r: number; c: number }[] = [];
+    const toConvert = new Set<string>();
 
     const isNeutral = (r: number, c: number) => {
         const cell = board[r][c];
@@ -140,34 +139,19 @@ export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
 
                 const neighbors = getNeighbors(r, c, size);
                 for (const n of neighbors) {
-                    if (isNeutral(n.r, n.c) && !visited.has(`${n.r}-${n.c}`)) {
-                        // Found a starting point for a neutral chain!
-                        const queue = [{ r: n.r, c: n.c }];
-                        visited.add(`${n.r}-${n.c}`);
-
-                        while (queue.length > 0) {
-                            const curr = queue.shift()!;
-                            toConvert.push(curr);
-
-                            const chainNeighbors = getNeighbors(curr.r, curr.c, size);
-                            for (const cn of chainNeighbors) {
-                                if (isNeutral(cn.r, cn.c) && !visited.has(`${cn.r}-${cn.c}`)) {
-                                    visited.add(`${cn.r}-${cn.c}`);
-                                    queue.push(cn);
-                                }
-                            }
-                        }
+                    if (isNeutral(n.r, n.c)) {
+                        toConvert.add(`${n.r}-${n.c}`);
                     }
                 }
             }
         }
     }
 
-    toConvert.forEach(pos => {
-        newBoard[pos.r][pos.c].type = activePlayer; // Ownership changes!
-        if (!newBoard[pos.r][pos.c].effects.includes('empathy')) {
-            newBoard[pos.r][pos.c].effects.push('empathy');
-        }
+    toConvert.forEach(key => {
+        const [r, c] = key.split('-').map(Number);
+        newBoard[r][c].type = activePlayer;
+        // Converted stone is a standard team stone, NOT an empathy stone
+        // So we don't push 'empathy' to effects
     });
 
     return newBoard;
