@@ -25,6 +25,7 @@ export interface GameState {
     boardSize: number;
     inventory: Record<Player, Inventory>;
     pendingSwap?: { r: number; c: number }; // For Manipulation stone
+    swappedPositions?: { r: number; c: number }[]; // Track stones moved by Manipulation for re-triggering
     moveConfirmed: boolean; // Has the player placed their main stone?
     difficulty?: AIDifficulty;
     isAiGame?: boolean;

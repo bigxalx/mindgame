@@ -613,17 +613,39 @@ export const getAIDecision = (
                     simulatedBoard[move.r][move.c].type = turn;
                     simulatedBoard[move.r][move.c].effects.push('manipulation');
 
-                    // Simulate swap: only swap types, keep effects in place (matching real swapMove logic)
+                    // Simulate swap: treat stone as unit (type + effects)
                     const tempType = simulatedBoard[move.r][move.c].type;
+                    const tempEffects = [...simulatedBoard[move.r][move.c].effects];
+
                     simulatedBoard[move.r][move.c].type = simulatedBoard[n.r][n.c].type;
+                    simulatedBoard[move.r][move.c].effects = [...simulatedBoard[n.r][n.c].effects];
+
                     simulatedBoard[n.r][n.c].type = tempType;
+                    simulatedBoard[n.r][n.c].effects = tempEffects;
+
                     // Consume manipulation effect from both cells
                     simulatedBoard[move.r][move.c].effects = simulatedBoard[move.r][move.c].effects.filter(e => e !== 'manipulation');
                     simulatedBoard[n.r][n.c].effects = simulatedBoard[n.r][n.c].effects.filter(e => e !== 'manipulation');
 
-                    // Resolve
-                    const { board: midBoard, destroyed: captured } = checkCaptures(simulatedBoard, turn);
-                    simulatedBoard = handleResolutionEvent(midBoard, captured, turn, state.turnCount || 0);
+                    // Resolve: Fire aggression from:
+                    // 1. The stone just placed (move.r, move.c) - if it still has aggression after swap
+                    // 2. The stone it swapped with (n.r, n.c) - if it has aggression
+                    const allSwapped = [{ r: move.r, c: move.c }, { r: n.r, c: n.c }];
+                    const captured: { r: number; c: number; type: StoneType }[] = [];
+
+                    allSwapped.forEach(pos => {
+                        if (simulatedBoard[pos.r][pos.c].effects.includes('aggression')) {
+                            const aggResult = triggerAggression(simulatedBoard, pos);
+                            simulatedBoard = aggResult.board;
+                            captured.push(...aggResult.destroyed);
+                        }
+                    });
+
+                    const capResult = checkCaptures(simulatedBoard, turn);
+                    simulatedBoard = capResult.board;
+                    captured.push(...capResult.destroyed);
+
+                    simulatedBoard = handleResolutionEvent(simulatedBoard, captured, turn, state.turnCount || 0);
 
                     // Turn transition
                     const opponent = turn === 'black' ? 'white' : 'black';

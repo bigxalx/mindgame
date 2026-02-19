@@ -262,8 +262,6 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                             className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-400/70 hover:text-amber-300 transition-all duration-200 group"
                             title="Rules & Help"
                         >
-                            {/* pulse ring */}
-                            <span className="absolute inset-0 rounded-full ring-1 ring-amber-400/30 animate-ping group-hover:hidden" />
                             <HelpCircle className="w-4 h-4 shrink-0" />
                             <span className="text-[10px] font-semibold tracking-wide uppercase">Rules</span>
                         </button>
@@ -772,7 +770,7 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                                 After placing a Manipulation stone, you choose <strong>two adjacent stones</strong> (both must be neighbours of the Manipulation stone) to swap positions.
                                             </p>
                                             <p className="text-sm text-slate-200 leading-relaxed">
-                                                Only the <strong>stone types</strong> move — all special effects stay attached to their original cells. The Manipulation effect is consumed after use.
+                                                Both <strong>stone types and special effects</strong> move together as a single unit. If a special stone (like Aggression) is moved, its ability <strong>re-triggers</strong> at the new position. The Manipulation effect is consumed after use.
                                             </p>
                                             <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
                                                 <p className="text-[11px] text-slate-400">Captures and spreading are re-evaluated after the swap.</p>

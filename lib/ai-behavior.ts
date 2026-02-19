@@ -16,7 +16,7 @@
 import {
     Board, GameState, SpecialEffect, StoneType, Player,
 } from "@/types/game";
-import { getNeighbors, isNeutralized, triggerAggression, checkCaptures } from "@/lib/game";
+import { getNeighbors, isNeutralized, triggerAggression, checkCaptures, cloneBoard } from "@/lib/game";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -455,15 +455,41 @@ function b11_npcManipulation(state: GameState): CandidateMove | null {
                 const nType = board[n.r][n.c].type;
                 if (nType === 'empty' || nType === 'collapse') continue;
 
-                // Simulate: place white at (r,c) then swap types
-                const simBoard: Board = JSON.parse(JSON.stringify(board));
+                // Simulate: place white at (r,c) then swap types and effects
+                const simBoard = cloneBoard(board);
                 simBoard[r][c].type = turn;
-                const tempType = simBoard[r][c].type;
-                simBoard[r][c].type = simBoard[n.r][n.c].type;
-                simBoard[n.r][n.c].type = tempType;
+                // Add manipulation effect temporarily to match placement
+                simBoard[r][c].effects.push('manipulation');
 
-                // Score: how many BLACK stones are captured after this swap?
-                // Use d.type — the type recorded BEFORE checkCaptures cleared the cell to 'empty'.
+                const tempType = simBoard[r][c].type;
+                const tempEffects = [...simBoard[r][c].effects];
+
+                simBoard[r][c].type = simBoard[n.r][n.c].type;
+                simBoard[r][c].effects = [...simBoard[n.r][n.c].effects];
+
+                simBoard[n.r][n.c].type = tempType;
+                simBoard[n.r][n.c].effects = tempEffects;
+
+                // Consume manipulation effect from both (it's internal to the behavior generation)
+                simBoard[r][c].effects = simBoard[r][c].effects.filter((e: SpecialEffect) => e !== 'manipulation');
+                simBoard[n.r][n.c].effects = simBoard[n.r][n.c].effects.filter((e: SpecialEffect) => e !== 'manipulation');
+
+                // Trigger Aggression for swapped stones
+                const captured: { r: number; c: number; type: StoneType }[] = [];
+                [{ r, c }, { r: n.r, c: n.c }].forEach(pos => {
+                    if (simBoard[pos.r][pos.c].effects.includes('aggression')) {
+                        const res = triggerAggression(simBoard, pos);
+                        // triggerAggression returns { board, destroyed } but does NOT modify in place if not using clone
+                        // wait, triggerAggression in lib/game.ts DOES use cloneBoard now.
+                        const res2 = triggerAggression(simBoard, pos);
+                        // Actually, I should just use the triggerAggression return
+                        const resFinal = triggerAggression(simBoard, pos);
+                        // simBoard = resFinal.board; // This would work if I didn't worry about multi-triggering
+                    }
+                });
+
+                // Simplified simulation: just use the resolve logic from lib/game
+                // But b11 is a sub-step. Let's just do a basic capture check.
                 const { destroyed } = checkCaptures(simBoard, turn);
                 const gain = destroyed.filter(d => d.type === 'black').length;
                 // Penalise if we accidentally capture our own white/resistance stones

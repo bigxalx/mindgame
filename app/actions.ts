@@ -3,7 +3,7 @@
 import { createGame, getGame, saveGame } from "@/lib/storage";
 import { GameState, Player, Board, SpecialEffect, AIDifficulty, AIBehavior, StoneType, Inventory } from "@/types/game";
 
-import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized, handleResolutionEvent } from "@/lib/game";
+import { createInitialBoard, cloneBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized, handleResolutionEvent } from "@/lib/game";
 
 // ---------------------------------------------------------------------------
 // Difficulty Configuration
@@ -207,6 +207,7 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         history: history,
         moveConfirmed: true, // Stone placed, now player can only swap or end turn
         pendingSwap: isManipulation ? { r, c } : undefined,
+        swappedPositions: [], // Initialize for this turn
     };
 
     // Check for win
@@ -239,17 +240,26 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
     const previousState = { ...state, history: [] };
     const history = [...state.history, previousState];
 
-    let newBoard = JSON.parse(JSON.stringify(state.board)) as Board;
+    let newBoard = cloneBoard(state.board);
 
-    // Swap ONLY stone types — effects stay on their original cells.
-    // This prevents Manipulation from "traveling" to a new position.
+    // Swap BOTH stone types and effects — trat stone as a single unit.
+    // Exclusion: id stays with the coordinate to avoid React key flickering issues or we can swap IDs too.
+    // Actually, swapping IDs is fine since they are unique identifiers for the "stone instance".
     const tempType = newBoard[r1][c1].type;
-    newBoard[r1][c1].type = newBoard[r2][c2].type;
-    newBoard[r2][c2].type = tempType;
+    const tempEffects = [...newBoard[r1][c1].effects];
 
-    // Consume the Manipulation effect (it's been used)
-    newBoard[r1][c1].effects = newBoard[r1][c1].effects.filter(e => e !== 'manipulation');
-    newBoard[r2][c2].effects = newBoard[r2][c2].effects.filter(e => e !== 'manipulation');
+    newBoard[r1][c1].type = newBoard[r2][c2].type;
+    newBoard[r1][c1].effects = [...newBoard[r2][c2].effects];
+
+    newBoard[r2][c2].type = tempType;
+    newBoard[r2][c2].effects = tempEffects;
+
+    // Track these positions for re-triggering in commitTurn
+    const swappedPositions = [{ r: r1, c: c1 }, { r: r2, c: c2 }];
+
+    // Consume the Manipulation effect from BOTH locations (the one placed AND any it swapped with if it was special)
+    newBoard[r1][c1].effects = newBoard[r1][c1].effects.filter((e: SpecialEffect) => e !== 'manipulation');
+    newBoard[r2][c2].effects = newBoard[r2][c2].effects.filter((e: SpecialEffect) => e !== 'manipulation');
 
     // Clear aftershock from both cells involved in the swap
     delete newBoard[r1][c1].aftershock;
@@ -263,6 +273,7 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
         board: newBoard,
         history: history,
         pendingSwap: undefined, // Swap done
+        swappedPositions: swappedPositions,
     };
 
     const winStatus = checkWin(newBoard, state.turn, state.turnCount);
@@ -306,10 +317,15 @@ export async function commitTurn(gameId: string) {
         const allDestroyed: { r: number; c: number; type: StoneType }[] = [];
 
         // 1. Resolve Placement Effects (Aggression)
-        // Only fire aggression for the CURRENT player's stones — opponent stones fired on their own turn.
+        // Trigger if:
+        // - It's the current player's stone (standard placement)
+        // - OR it was moved this turn by Manipulation (re-triggering regardless of owner)
         for (let r = 0; r < newBoard.length; r++) {
             for (let c = 0; c < newBoard.length; c++) {
-                if (newBoard[r][c].effects.includes('aggression') && newBoard[r][c].type === state.turn) {
+                const isSwapped = state.swappedPositions?.some(p => p.r === r && p.c === c);
+                const isCurrentPlayerStone = newBoard[r][c].type === state.turn;
+
+                if (newBoard[r][c].effects.includes('aggression') && (isCurrentPlayerStone || isSwapped)) {
                     const result = triggerAggression(newBoard, { r, c });
                     newBoard = result.board;
                     allDestroyed.push(...result.destroyed);
