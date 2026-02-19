@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GameState, Player, SpecialEffect, Cell, Board } from "@/types/game";
+import { GameState, Player, SpecialEffect, Cell, Board, Inventory } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Zap, Heart, Target, Loader2, Sparkles } from "lucide-react";
@@ -136,9 +136,9 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
         { id: 'manipulation', icon: Zap, color: 'text-purple-400', glow: 'shadow-[0_0_15px_rgba(192,132,252,0.5)]', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
     ];
 
-    const currentInventory = (role === 'black' || role === 'white')
-        ? state.inventory[role]
-        : { empathy: 0, control: 0, aggression: 0, manipulation: 0 } as Record<SpecialEffect, number>;
+    const currentInventory = (role && role !== 'spectator')
+        ? state.inventory[role as Player]
+        : { empathy: 0, control: 0, aggression: 0, manipulation: 0 } as Inventory;
 
     const getAffectedCells = (r: number, c: number, effect: SpecialEffect | null) => {
         if (!effect) return [];
@@ -325,8 +325,8 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                             gridTemplateRows: `repeat(${state.boardSize}, 1fr)`,
                         }}
                     >
-                        {state.board.map((row, r) =>
-                            row.map((cell, c) => (
+                        {state.board.map((row: Cell[], r: number) =>
+                            row.map((cell: Cell, c: number) => (
                                 <div
                                     key={cell.id}
                                     className="relative flex items-center justify-center group touch-none"
