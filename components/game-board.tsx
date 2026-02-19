@@ -5,7 +5,7 @@ import { GameState, Player, SpecialEffect, Cell, Board, Inventory } from "@/type
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Zap, Heart, Target, Loader2, Sparkles } from "lucide-react";
-import { getAIDecision, getNeighbors } from "@/lib/game";
+import { getAIDecision, getNeighbors, isNeutralized } from "@/lib/game";
 import { toast } from "sonner";
 
 interface Props {
@@ -20,13 +20,26 @@ interface Props {
 }
 
 // Helper to check influence for dots
-function isCellUnderInfluence(board: Board, r: number, c: number, effect: string): boolean {
+function isCellUnderInfluence(board: Board, r: number, c: number, effect: string, preview?: { r: number, c: number, effect: SpecialEffect | null }): boolean {
     const size = board.length;
     const neighbors = getNeighbors(r, c, size);
 
-    // For specific dots, we check if ANY neighbor has the active effect
-    // (Ignoring neutralization for the dots to show potential range)
-    return neighbors.some(n => board[n.r][n.c].effects.includes(effect as any));
+    // 1. Check existing stones on board
+    // Only source stones that are NOT neutralized provide influence
+    const hasExisting = neighbors.some(n => {
+        const neighbor = board[n.r][n.c];
+        return neighbor.effects.includes(effect as any) && !isNeutralized(board, n.r, n.c);
+    });
+    if (hasExisting) return true;
+
+    // 2. Check preview placement (if any)
+    if (preview && preview.effect === effect) {
+        // Previewed stone is not neutralized yet (as it's just a preview)
+        const dist = Math.abs(r - preview.r) + Math.abs(c - preview.c);
+        if (dist === 1) return true;
+    }
+
+    return false;
 }
 
 export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onActionTypeChange, onRestart }: Props) {
@@ -230,30 +243,55 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
 
             {/* Board Wrapper (Hypnotic Neural Synapse Background) */}
             <div
-                className="relative rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden group border border-slate-800/50 bg-[#020205]"
+                className="relative rounded-[2.5rem] shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden group border border-white/5 bg-transparent"
                 style={{
                     width: 'min(95vw, 750px)',
                     height: 'min(95vw, 750px)',
                     padding: '8%',
                 }}
             >
-                {/* 1. Universal Cosmic Depth */}
-                <div className="fixed inset-0 bg-[#020208] z-[-2]" />
+                {/* 1. Base Universe */}
+                <div className="absolute inset-0 bg-black z-[-10]" />
 
-                {/* Layered Neural Fog (Fixing Visibility & Scale) */}
+                {/* 2. Advanced Neural Synapse Web (Deep Space Neural Web) */}
+                <div className="absolute inset-0 z-[-9] pointer-events-none overflow-hidden blur-[0.5px]">
+                    {[...Array(12)].map((_, i) => (
+                        <motion.div
+                            key={`synapse-${i}`}
+                            animate={{
+                                opacity: [0.1, 0.4, 0.1],
+                                scale: [0.9, 1.1, 0.9],
+                            }}
+                            transition={{ duration: 12 + i * 2, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute"
+                            style={{
+                                top: `${Math.random() * 100}%`,
+                                left: `${Math.random() * 100}%`,
+                                width: `${300 + Math.random() * 500}px`,
+                                height: '1.2px',
+                                background: `linear-gradient(90deg, transparent, ${i % 3 === 0 ? '#fbbf24' : i % 3 === 1 ? '#6366f1' : '#ec4899'}, transparent)`,
+                                transform: `rotate(${Math.random() * 360}deg)`,
+                                filter: 'blur(2px)',
+                                boxShadow: `0 0 20px ${i % 3 === 0 ? 'rgba(251,191,36,0.3)' : i % 3 === 1 ? 'rgba(99,102,241,0.3)' : 'rgba(236,72,153,0.3)'}`
+                            }}
+                        />
+                    ))}
+                </div>
+
+                {/* 3. Celestial Fog Layers (Richer Colors) */}
                 <motion.div
-                    animate={{ scale: [1, 1.15, 1], rotate: [0, 5, 0], opacity: [0.3, 0.5, 0.3] }}
-                    transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_30%_30%,rgba(60,40,120,0.4)_0%,transparent_50%)] blur-[80px] z-[-1]"
-                />
-                <motion.div
-                    animate={{ scale: [1.1, 1, 1.1], rotate: [0, -5, 0], opacity: [0.2, 0.4, 0.2] }}
+                    animate={{ scale: [1, 1.1, 1], opacity: [0.4, 0.6, 0.4], x: [-15, 15, -15] }}
                     transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_70%_70%,rgba(40,60,150,0.3)_0%,transparent_50%)] blur-[100px] z-[-1]"
+                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_20%_20%,rgba(60,60,250,0.5)_0%,transparent_50%)] blur-[90px] z-[-8]"
+                />
+                <motion.div
+                    animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3], x: [15, -15, 15] }}
+                    transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_80%_80%,rgba(180,50,220,0.4)_0%,transparent_50%)] blur-[110px] z-[-7]"
                 />
 
-                {/* Vignette for Focus */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.8)_100%)] z-0 pointer-events-none" />
+                {/* 4. Vignette for Focus */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,1)_100%)] z-[-5] pointer-events-none" />
 
                 {/* Random Synapse Flashes Layer */}
                 <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
@@ -304,14 +342,15 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                             <motion.div
                                 key={`affected-${idx}`}
                                 initial={{ opacity: 0, scale: 0.5 }}
-                                animate={{ opacity: 0.4, scale: 1 }}
+                                animate={{ opacity: 0.6, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.5 }}
-                                className={cn("absolute pointer-events-none rounded-full blur-xl z-0", effectColor || "bg-blue-400")}
+                                className={cn("absolute pointer-events-none rounded-full blur-2xl z-0", effectColor || "bg-blue-400")}
                                 style={{
                                     width: `${100 / state.boardSize}%`,
                                     height: `${100 / state.boardSize}%`,
                                     left: `${(cell.c / state.boardSize) * 100}%`,
                                     top: `${(cell.r / state.boardSize) * 100}%`,
+                                    transform: 'scale(1.5)', // Larger glow for preview
                                 }}
                             />
                         ))}
@@ -354,23 +393,30 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                         className="absolute w-1.5 h-1.5 rounded-full bg-[#fce7d5]/60 blur-[0.5px] z-0 shadow-[0_0_10px_rgba(252,231,213,0.5)]"
                                     />
 
-                                    {/* Cognitive Influence Markers (Small Dots) */}
-                                    <div className="absolute inset-x-0 bottom-1 flex items-center justify-center pointer-events-none z-40">
-                                        <div className="flex gap-1 px-1 py-0.5 rounded-full bg-black/20 backdrop-blur-[2px]">
-                                            {/* Empathy Influence (Green) - Only on Neutral Pieces or Empty */}
-                                            {((cell.type === 'black' || cell.type === 'white') && cell.effects.length === 0 || cell.type === 'empty') &&
-                                                isCellUnderInfluence(state.board, r, c, 'empathy') && (
+                                    {/* Cognitive Influence Markers (Centered Dots) */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                                        <div className="flex gap-2">
+                                            {/* Empathy Influence (Green) */}
+                                            {/* Show on grid ONLY during placement; show on stones ONLY if neutral */}
+                                            {isCellUnderInfluence(state.board, r, c, 'empathy', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
+                                                ((cell.type === 'empty' && hovering && canMove) ||
+                                                    (cell.type !== 'empty' && cell.effects.length === 0 && cell.type !== 'resistance')) && (
                                                     <motion.div
-                                                        initial={{ scale: 0 }} animate={{ scale: 1 }}
-                                                        className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                                                        animate={{ scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }}
+                                                        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                                                        className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] border border-white/20"
                                                     />
-                                                )}
+                                                )
+                                            )}
                                             {/* Control Influence (Blue) */}
-                                            {isCellUnderInfluence(state.board, r, c, 'control') && (
-                                                <motion.div
-                                                    initial={{ scale: 0 }} animate={{ scale: 1 }}
-                                                    className="w-1 h-1 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.8)]"
-                                                />
+                                            {isCellUnderInfluence(state.board, r, c, 'control', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
+                                                ((cell.type === 'empty' && hovering && canMove) || cell.type !== 'empty') && (
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }}
+                                                        transition={{ duration: 1.2, repeat: Infinity, delay: 0.3, ease: "easeInOut" }}
+                                                        className="w-3 h-3 rounded-full bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,1)] border border-white/20"
+                                                    />
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -389,11 +435,27 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                                     cell.type === 'black' && "bg-black",
                                                     cell.type === 'white' && "bg-white",
                                                     cell.type === 'resistance' && "bg-yellow-400 border-none shadow-[0_0_20px_rgba(250,204,21,0.4)]",
-                                                    // Interior Aura Rings (50% Mass)
-                                                    cell.effects.includes('empathy') && "ring-[10px] ring-inset ring-emerald-500/40",
-                                                    cell.effects.includes('control') && "ring-[10px] ring-inset ring-blue-500/40",
-                                                    cell.effects.includes('aggression') && "ring-[10px] ring-inset ring-rose-500/40",
-                                                    cell.effects.includes('manipulation') && "ring-[10px] ring-inset ring-purple-500/40",
+                                                    // Interior Aura Rings (50% Mass) - Updated for Neutralization
+                                                    cell.effects.includes('empathy') && (
+                                                        isNeutralized(state.board, r, c)
+                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                            : "ring-[10px] ring-inset ring-emerald-500/40"
+                                                    ),
+                                                    cell.effects.includes('control') && (
+                                                        isNeutralized(state.board, r, c)
+                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                            : "ring-[10px] ring-inset ring-blue-500/40"
+                                                    ),
+                                                    cell.effects.includes('aggression') && (
+                                                        isNeutralized(state.board, r, c)
+                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                            : "ring-[10px] ring-inset ring-rose-500/40"
+                                                    ),
+                                                    cell.effects.includes('manipulation') && (
+                                                        isNeutralized(state.board, r, c)
+                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                            : "ring-[10px] ring-inset ring-purple-500/40"
+                                                    ),
                                                     swapSelection?.r === r && swapSelection?.c === c && "ring-[4px] ring-white scale-110 shadow-[0_0_30px_rgba(255,255,255,0.8)]"
                                                 )}
                                             >

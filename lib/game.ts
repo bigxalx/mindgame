@@ -14,8 +14,8 @@ export const createInitialBoard = (size: number): Board => {
         board.push(row);
     }
 
-    // White starts with 1-2 resistance stones
-    const numResistance = Math.floor(Math.random() * 2) + 1;
+    // White starts with exactly 2 resistance stones
+    const numResistance = 2;
     const positions: [number, number][] = [];
 
     while (positions.length < numResistance) {
@@ -150,8 +150,10 @@ export const spreadEmpathy = (board: Board, activePlayer: Player): Board => {
     toConvert.forEach(key => {
         const [r, c] = key.split('-').map(Number);
         newBoard[r][c].type = activePlayer;
-        // Converted stone is a standard team stone, NOT an empathy stone
-        // So we don't push 'empathy' to effects
+        // VIRAL: Converted stone also becomes an Empathy stone of the new owner
+        if (!newBoard[r][c].effects.includes('empathy')) {
+            newBoard[r][c].effects.push('empathy');
+        }
     });
 
     return newBoard;

@@ -89,11 +89,8 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
     // Apply immediate effect (Aggression/Manipulation)
     // Control is now dynamic via isNeutralized helper
 
-    if (effect === 'aggression' && newBoard[r][c].effects.includes('aggression')) {
-        newBoard = triggerAggression(newBoard, { r, c });
-    }
 
-    newBoard = checkCaptures(newBoard, player);
+    // Aggression and captures are delayed until commitTurn
 
     const isManipulation = effect === 'manipulation' &&
         newBoard[r][c].effects.includes('manipulation') &&
@@ -138,14 +135,8 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
     newBoard[r2][c2].type = tempType;
     newBoard[r2][c2].effects = tempEffects;
 
-    // Re-trigger aggression stones nearby (Counts as movement)
-    // Aggression triggers when placed OR moved (Manipulation)
-    newBoard = triggerAggression(newBoard, { r: r1, c: c1 });
-    newBoard = triggerAggression(newBoard, { r: r2, c: c2 });
-
-    // Aftershock/Collapse would go here
-
-    newBoard = checkCaptures(newBoard, state.turn);
+    // NO DESTRUCTIVE EFFECTS UNTIL COMMIT
+    // (Aggression/Captures handled in commitTurn)
 
     const newState: GameState = {
         ...state,
@@ -187,17 +178,44 @@ export async function commitTurn(gameId: string) {
     let newBoard = JSON.parse(JSON.stringify(state.board)) as Board;
     const nextPlayer = state.turn === 'black' ? 'white' : 'black';
 
-    // Current board check for state at end of move
-    const winStatus = checkWin(newBoard, state.turn);
+    // START OF TURN LOGIC (Only if game is NOT already over)
+    let gameOver = false;
+    let winner: Player | null = null;
 
-    // START OF TURN LOGIC (Only if game is NOT over)
-    if (!winStatus.gameOver) {
+    if (!checkWin(newBoard, state.turn).gameOver) {
+        // 1. Resolve Placement Effects (Aggression from the stone placed this turn)
+        // Find the stone placed this turn by comparing board with history? 
+        // Or simply iterate all aggression stones and trigger them.
+        for (let r = 0; r < newBoard.length; r++) {
+            for (let c = 0; c < newBoard.length; c++) {
+                if (newBoard[r][c].effects.includes('aggression')) {
+                    newBoard = triggerAggression(newBoard, { r, c });
+                }
+            }
+        }
+
+        // 2. Resolve initial captures (Suicide/Normal)
+        newBoard = checkCaptures(newBoard, state.turn);
+
+        // 3. Resolve spreading effects
         newBoard = spreadEmpathy(newBoard, nextPlayer);
 
         if (nextPlayer === 'white') {
             const result = spreadResistance(newBoard);
             newBoard = result.board;
         }
+
+        // 4. Resolve captures that may have resulted from spreading
+        newBoard = checkCaptures(newBoard, nextPlayer);
+
+        // 5. Final win check for the start of the next player's turn
+        const finalWinStatus = checkWin(newBoard, nextPlayer);
+        gameOver = finalWinStatus.gameOver;
+        winner = finalWinStatus.winner;
+    } else {
+        const winStatus = checkWin(newBoard, state.turn);
+        gameOver = winStatus.gameOver;
+        winner = winStatus.winner;
     }
 
     const newState: GameState = {
@@ -207,8 +225,8 @@ export async function commitTurn(gameId: string) {
         moveConfirmed: false,
         pendingSwap: undefined,
         history: [], // Clear history for new turn
-        gameOver: winStatus.gameOver,
-        winner: winStatus.winner,
+        gameOver,
+        winner,
     };
 
     await saveGame(gameId, newState);
