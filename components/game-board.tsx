@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GameState, Player, SpecialEffect, Cell, Board, Inventory } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Heart, Target, Loader2, Sparkles } from "lucide-react";
+import { Shield, Zap, Heart, Target, Loader2, Sparkles, HelpCircle, X, Swords } from "lucide-react";
 import { getAIDecision, getNeighbors, isNeutralized } from "@/lib/game";
 import { toast } from "sonner";
 
@@ -48,6 +48,8 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
     const [isProcessing, setIsProcessing] = useState(false);
     const [swapSelection, setSwapSelection] = useState<{ r: number; c: number } | null>(null);
     const [aiPlannedSwap, setAiPlannedSwap] = useState<{ r1: number; c1: number; r2: number; c2: number } | null>(null);
+    const [showHelp, setShowHelp] = useState(false);
+    const [helpTab, setHelpTab] = useState<'goal' | 'empathy' | 'control' | 'aggression' | 'manipulation'>('goal');
 
     // Stable filament positions — computed once to avoid hydration mismatch
     const filamentStyles = useMemo(() =>
@@ -246,7 +248,16 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
             <div className="w-full max-w-md space-y-3">
                 <div className="flex justify-between items-center mb-1 px-1">
                     <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Stones</p>
-                    <p className="text-[10px] text-slate-400 font-medium">Player: <span className="uppercase text-slate-200">{role || state.turn}</span></p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-slate-400 font-medium">Player: <span className="uppercase text-slate-200">{role || state.turn}</span></p>
+                        <button
+                            onClick={() => { setShowHelp(true); setHelpTab('goal'); }}
+                            className="text-slate-500 hover:text-slate-300 transition-colors"
+                            title="Rules & Help"
+                        >
+                            <HelpCircle className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                     {effectsList.map((eff) => {
@@ -614,6 +625,156 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                 </div>
             </div>
 
+
+            {/* Rules / Help Modal */}
+            <AnimatePresence>
+                {showHelp && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setShowHelp(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.92, y: 16 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.92, y: 16 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 pt-6 pb-3">
+                                <h2 className="text-lg font-black tracking-tighter text-white uppercase italic">Rules</h2>
+                                <button onClick={() => setShowHelp(false)} className="text-slate-500 hover:text-white transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="flex gap-1 px-4 pb-2 overflow-x-auto">
+                                {([
+                                    { id: 'goal', label: 'Goal', icon: Swords, color: 'text-slate-300' },
+                                    { id: 'empathy', label: 'Empathy', icon: Heart, color: 'text-green-400' },
+                                    { id: 'control', label: 'Control', icon: Shield, color: 'text-blue-400' },
+                                    { id: 'aggression', label: 'Aggression', icon: Target, color: 'text-red-400' },
+                                    { id: 'manipulation', label: 'Manip.', icon: Zap, color: 'text-purple-400' },
+                                ] as const).map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setHelpTab(tab.id)}
+                                        className={cn(
+                                            "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all",
+                                            helpTab === tab.id
+                                                ? "bg-slate-800 text-white"
+                                                : "text-slate-500 hover:text-slate-300"
+                                        )}
+                                    >
+                                        <tab.icon className={cn("w-3 h-3", helpTab === tab.id ? tab.color : '')} />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="px-6 pb-6 pt-2 min-h-[200px]">
+                                <AnimatePresence mode="wait">
+                                    {helpTab === 'goal' && (
+                                        <motion.div key="goal" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Objective</p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                You play as <span className="font-bold text-white">Black</span>. Your goal is to capture all
+                                                {' '}<span className="font-bold text-yellow-400">Resistance stones</span> before the turn limit expires.
+                                            </p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                Capture works like Go: surround an enemy group on all sides with no empty neighbours (no liberties) and it is destroyed.
+                                            </p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                If the turn limit runs out and any Resistance stones remain, <span className="font-bold text-white">White wins</span>.
+                                            </p>
+                                            <div className="mt-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">
+                                                    <span className="font-bold text-amber-400">Aftershock</span> — when stones are captured, a pulsing residue remains for one round cycle. The losing team cannot immediately reclaim that cell.
+                                                </p>
+                                            </div>
+                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">
+                                                    <span className="font-bold text-slate-200">Collapse</span> — if 4 or more stones are destroyed in a single event, the geometric centre of the destroyed group becomes a permanent void. Nothing can be placed there.
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                    {helpTab === 'empathy' && (
+                                        <motion.div key="empathy" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Heart className="w-5 h-5 text-green-400" />
+                                                <p className="text-xs font-bold uppercase tracking-widest text-green-400">Empathy</p>
+                                            </div>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                At the <strong>start of its owner's turn</strong>, an Empathy stone converts all adjacent <em>neutral</em> (no-effect) opponent stones to its colour — and each converted stone also becomes an Empathy stone, spreading the effect virally.
+                                            </p>
+                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">Growth is <span className="font-bold text-slate-300">blocked</span> if the Empathy stone is neutralised by an adjacent enemy Control stone.</p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                    {helpTab === 'control' && (
+                                        <motion.div key="control" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Shield className="w-5 h-5 text-blue-400" />
+                                                <p className="text-xs font-bold uppercase tracking-widest text-blue-400">Control</p>
+                                            </div>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                An active Control stone <strong>suppresses</strong> all adjacent opponent stones, blocking their special effects (Empathy growth, Resistance spread).
+                                            </p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                Two opposing Control stones that are adjacent <strong>neutralise each other</strong> — both become inactive.
+                                            </p>
+                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">A neutralised stone appears greyed-out and no longer exerts its effect.</p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                    {helpTab === 'aggression' && (
+                                        <motion.div key="aggression" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Target className="w-5 h-5 text-red-400" />
+                                                <p className="text-xs font-bold uppercase tracking-widest text-red-400">Aggression</p>
+                                            </div>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                Place two Aggression stones in the <strong>same row or column</strong> with no empty gaps between them. All stones between the two are immediately destroyed.
+                                            </p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                The beam stops at empty cells or Collapse voids — it will not fire through gaps.
+                                            </p>
+                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">The destroyed stones still trigger <span className="font-bold text-amber-400">Aftershock</span> and can cause a <span className="font-bold text-slate-200">Collapse</span> if 4+ are destroyed.</p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                    {helpTab === 'manipulation' && (
+                                        <motion.div key="manipulation" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Zap className="w-5 h-5 text-purple-400" />
+                                                <p className="text-xs font-bold uppercase tracking-widest text-purple-400">Manipulation</p>
+                                            </div>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                After placing a Manipulation stone, you choose <strong>two adjacent stones</strong> (both must be neighbours of the Manipulation stone) to swap positions.
+                                            </p>
+                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                                Only the <strong>stone types</strong> move — all special effects stay attached to their original cells. The Manipulation effect is consumed after use.
+                                            </p>
+                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                                                <p className="text-[11px] text-slate-400">Captures and spreading are re-evaluated after the swap.</p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Game Over Modal */}
             <AnimatePresence>
