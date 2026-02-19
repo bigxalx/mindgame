@@ -250,29 +250,32 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                     padding: '8%',
                 }}
             >
-                {/* 1. Base Universe */}
-                <div className="absolute inset-0 bg-black z-[-10]" />
+                {/* 1. Base Universe / Synapse Image */}
+                <div
+                    className="absolute inset-0 z-[-10] bg-cover bg-center bg-no-repeat opacity-100"
+                    style={{ backgroundImage: 'url(/synapse_bg.png)' }}
+                />
 
                 {/* 2. Advanced Neural Synapse Web (Deep Space Neural Web) */}
-                <div className="absolute inset-0 z-[-9] pointer-events-none overflow-hidden blur-[0.5px]">
+                <div className="absolute inset-0 z-[-9] pointer-events-none overflow-hidden blur-[0.1px] opacity-80">
                     {[...Array(12)].map((_, i) => (
                         <motion.div
                             key={`synapse-${i}`}
                             animate={{
-                                opacity: [0.1, 0.4, 0.1],
-                                scale: [0.9, 1.1, 0.9],
+                                opacity: [0.2, 0.6, 0.2],
+                                scale: [0.95, 1.05, 0.95],
                             }}
                             transition={{ duration: 12 + i * 2, repeat: Infinity, ease: "easeInOut" }}
                             className="absolute"
                             style={{
                                 top: `${Math.random() * 100}%`,
                                 left: `${Math.random() * 100}%`,
-                                width: `${300 + Math.random() * 500}px`,
-                                height: '1.2px',
+                                width: `${400 + Math.random() * 600}px`,
+                                height: '1.5px',
                                 background: `linear-gradient(90deg, transparent, ${i % 3 === 0 ? '#fbbf24' : i % 3 === 1 ? '#6366f1' : '#ec4899'}, transparent)`,
                                 transform: `rotate(${Math.random() * 360}deg)`,
-                                filter: 'blur(2px)',
-                                boxShadow: `0 0 20px ${i % 3 === 0 ? 'rgba(251,191,36,0.3)' : i % 3 === 1 ? 'rgba(99,102,241,0.3)' : 'rgba(236,72,153,0.3)'}`
+                                filter: 'blur(1.5px)',
+                                boxShadow: `0 0 25px ${i % 3 === 0 ? 'rgba(251,191,36,0.5)' : i % 3 === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(236,72,153,0.5)'}`
                             }}
                         />
                     ))}
@@ -280,21 +283,21 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
 
                 {/* 3. Celestial Fog Layers (Richer Colors) */}
                 <motion.div
-                    animate={{ scale: [1, 1.1, 1], opacity: [0.4, 0.6, 0.4], x: [-15, 15, -15] }}
+                    animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5], x: [-20, 20, -20] }}
                     transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_20%_20%,rgba(60,60,250,0.5)_0%,transparent_50%)] blur-[90px] z-[-8]"
+                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_20%_20%,rgba(60,60,250,0.6)_0%,transparent_50%)] blur-[70px] z-[-8]"
                 />
                 <motion.div
-                    animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.5, 0.3], x: [15, -15, 15] }}
+                    animate={{ scale: [1.15, 1, 1.15], opacity: [0.4, 0.7, 0.4], x: [20, -20, 20] }}
                     transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_80%_80%,rgba(180,50,220,0.4)_0%,transparent_50%)] blur-[110px] z-[-7]"
+                    className="absolute inset-[-40%] bg-[radial-gradient(circle_at_80%_80%,rgba(180,50,220,0.5)_0%,transparent_50%)] blur-[80px] z-[-7]"
                 />
 
-                {/* 4. Vignette for Focus */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,1)_100%)] z-[-5] pointer-events-none" />
+                {/* 4. Softened Vignette for Focus */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_50%,rgba(0,0,0,0.85)_100%)] z-[-6] pointer-events-none" />
 
                 {/* Random Synapse Flashes Layer */}
-                <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+                <div className="absolute inset-0 z-[-5] opacity-50 pointer-events-none">
                     {[...Array(10)].map((_, i) => (
                         <motion.div
                             key={`flash-${i}`}
@@ -308,14 +311,14 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                 delay: Math.random() * 15,
                                 repeatDelay: Math.random() * 8
                             }}
-                            className="absolute bg-indigo-400/50 blur-[2px] rounded-full"
+                            className="absolute bg-indigo-300/60 blur-[1px] rounded-full"
                             style={{
-                                width: '1px',
-                                height: `${Math.random() * 150 + 80}px`,
+                                width: '1.2px',
+                                height: `${Math.random() * 200 + 100}px`,
                                 top: `${Math.random() * 100}%`,
                                 left: `${Math.random() * 100}%`,
                                 transform: `rotate(${Math.random() * 360}deg)`,
-                                boxShadow: '0 0 15px rgba(129, 140, 248, 0.4)'
+                                boxShadow: '0 0 20px rgba(165, 180, 252, 0.6)'
                             }}
                         />
                     ))}
