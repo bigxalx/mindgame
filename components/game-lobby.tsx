@@ -23,13 +23,13 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
     const [difficulty, setDifficulty] = useState<AIDifficulty>("medium");
 
     return (
-        <Card className="w-full max-w-sm bg-slate-900 border-slate-800 text-slate-50 shadow-2xl shadow-blue-900/10">
+        <Card className="w-full max-w-sm bg-[#05050a]/80 backdrop-blur-xl border-slate-800/50 text-slate-50 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-t border-white/5">
             <CardHeader className="text-center">
                 <div className="mx-auto w-24 h-24 rounded-2xl overflow-hidden mb-4 border-2 border-slate-800 shadow-xl">
                     <img src="/icon.png" alt="Mind Game" className="w-full h-full object-cover" />
                 </div>
-                <CardTitle className="text-2xl font-bold tracking-tight">Mind Game</CardTitle>
-                <CardDescription className="text-slate-400">A tactical board game of spread and control</CardDescription>
+                <CardTitle className="text-2xl font-bold tracking-tight text-white">Mind Game</CardTitle>
+                <CardDescription className="text-slate-400">Tactical neural hypnosis</CardDescription>
                 <p className="text-[11px] text-center w-full text-slate-400 font-medium italic pt-1">
                     Created by Big, who originally had this idea
                 </p>
@@ -42,7 +42,7 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                         placeholder="Enter nickname..."
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
-                        className="bg-slate-950 border-slate-800 focus:ring-blue-500/20"
+                        className="bg-[#020205]/60 border-slate-800 focus:ring-indigo-500/20"
                     />
                 </div>
 
@@ -123,7 +123,7 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
             </CardContent>
             <CardFooter>
                 <p className="text-[10px] text-center w-full text-slate-500 leading-tight">
-                    Goal: As Black, neutralize Resistance. White defends. One stone turns into Resistance each turn.
+                    Goal: As the Mentalist (Black), capture all Resistance. Protect the host's mind.
                 </p>
             </CardFooter>
         </Card>

@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { GameState, Player, SpecialEffect, Cell } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Heart, Target, Loader2 } from "lucide-react";
+import { Shield, Zap, Heart, Target, Loader2, Sparkles } from "lucide-react";
 import { getAIDecision, getNeighbors } from "@/lib/game";
-import { toast } from "sonner"; // Assuming toast is from sonner or similar library
+import { toast } from "sonner";
 
 interface Props {
     state: GameState;
@@ -117,11 +117,11 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
         return () => clearTimeout(timer);
     }, [state.turn, isAiMode, state.isAiGame, state.gameOver, isProcessing, state.difficulty, state.moveConfirmed, state.pendingSwap]);
 
-    const effectsList: { id: SpecialEffect; icon: any; color: string; label: string; desc: string }[] = [
-        { id: 'empathy', icon: Heart, color: 'text-green-400', label: 'Empathy', desc: 'Converts adjacent neutral stones at turn start.' },
-        { id: 'control', icon: Shield, color: 'text-blue-400', label: 'Control', desc: 'Blocks all spreading (Resistance & Empathy).' },
-        { id: 'aggression', icon: Target, color: 'text-red-400', label: 'Aggression', desc: 'Place two in line to destroy stones between.' },
-        { id: 'manipulation', icon: Zap, color: 'text-purple-400', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
+    const effectsList: { id: SpecialEffect; icon: any; color: string; glow: string; label: string; desc: string }[] = [
+        { id: 'empathy', icon: Heart, color: 'text-green-400', glow: 'shadow-[0_0_15px_rgba(74,222,128,0.5)]', label: 'Empathy', desc: 'Converts adjacent neutral stones at turn start.' },
+        { id: 'control', icon: Shield, color: 'text-blue-400', glow: 'shadow-[0_0_15px_rgba(96,165,250,0.5)]', label: 'Control', desc: 'Blocks all spreading (Resistance & Empathy).' },
+        { id: 'aggression', icon: Target, color: 'text-red-400', glow: 'shadow-[0_0_15px_rgba(248,113,113,0.5)]', label: 'Aggression', desc: 'Place two in line to destroy stones between.' },
+        { id: 'manipulation', icon: Zap, color: 'text-purple-400', glow: 'shadow-[0_0_15px_rgba(192,132,252,0.5)]', label: 'Manipulation', desc: 'Swap adjacent stones upon placement.' },
     ];
 
     const currentInventory = role === 'spectator' ? { aggression: 0, manipulation: 0, control: 0, empathy: 0 } : state.inventory[role || state.turn];
@@ -214,21 +214,53 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                 </AnimatePresence>
             </div>
 
-            {/* Board Wrapper (Background Art) */}
+            {/* Board Wrapper (Hypnotic Neural Synapse Background) */}
             <div
-                className="relative rounded-[2.5rem] shadow-2xl overflow-hidden group border border-slate-700/50"
+                className="relative rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden group border border-slate-800/50 bg-[#020205]"
                 style={{
-                    width: 'min(95vw, 700px)',
-                    height: 'min(95vw, 700px)',
-                    backgroundImage: 'url("/board.png")',
-                    backgroundSize: '100% 100%',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    padding: '10%',
+                    width: 'min(95vw, 750px)',
+                    height: 'min(95vw, 750px)',
+                    padding: '8%',
                 }}
             >
-                {/* Subtle overlay to help stone contrast */}
-                <div className="absolute inset-0 bg-slate-950/10 pointer-events-none z-0" />
+                {/* 1. Cosmic Depth & Synapse Fog Layers */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,10,30,1)_0%,rgba(2,2,5,1)_100%)]" />
+
+                {/* Animated Brain Fog Layers */}
+                <motion.div
+                    animate={{ x: [0, 50, 0], y: [0, 30, 0], opacity: [0.1, 0.2, 0.1] }}
+                    transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                    className="absolute top-[-10%] left-[-10%] w-[120%] h-[120%] bg-[radial-gradient(circle,rgba(60,40,100,0.15)_0%,transparent_60%)] blur-[80px]"
+                />
+                <motion.div
+                    animate={{ x: [0, -40, 0], y: [0, 50, 0], opacity: [0.05, 0.15, 0.05] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    className="absolute bottom-[-20%] right-[-10%] w-[130%] h-[130%] bg-[radial-gradient(circle,rgba(40,60,120,0.12)_0%,transparent_60%)] blur-[100px]"
+                />
+
+                {/* Random Synapse Flashes Layer */}
+                <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                    {[...Array(6)].map((_, i) => (
+                        <motion.div
+                            key={`flash-${i}`}
+                            animate={{ opacity: [0, 0.8, 0] }}
+                            transition={{
+                                duration: Math.random() * 2 + 1,
+                                repeat: Infinity,
+                                delay: Math.random() * 10,
+                                repeatDelay: Math.random() * 5
+                            }}
+                            className="absolute bg-white/40 blur-[1px]"
+                            style={{
+                                width: '2px',
+                                height: `${Math.random() * 100 + 50}px`,
+                                top: `${Math.random() * 100}%`,
+                                left: `${Math.random() * 100}%`,
+                                transform: `rotate(${Math.random() * 360}deg)`,
+                            }}
+                        />
+                    ))}
+                </div>
 
                 {/* The Interactive Board (Centered Grid) */}
                 <div className="relative w-full h-full z-10">
@@ -242,7 +274,7 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                 exit={{ opacity: 0 }}
                                 className="absolute inset-0 pointer-events-none z-0"
                                 style={{
-                                    background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(59, 130, 246, 0.15) 0%, transparent 20%)`
+                                    background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(139, 92, 246, 0.12) 0%, transparent 25%)`
                                 }}
                             />
                         )}
@@ -281,18 +313,27 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                     onMouseEnter={() => setHovering({ r, c })}
                                     onMouseLeave={() => setHovering(null)}
                                 >
-                                    {/* Vertical Line */}
+                                    {/* Energy Filaments (Grid Lines) */}
                                     <div className={cn(
-                                        "absolute w-[2.5px] bg-slate-200/40 z-0",
-                                        r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full"
+                                        "absolute w-[1px] bg-white/10 shadow-[0_0_5px_rgba(255,255,255,0.05)] transition-all duration-700 z-0",
+                                        r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
+                                        hovering?.c === c && "bg-white/20 shadow-[0_0_8px_rgba(255,255,255,0.1)]"
                                     )}></div>
-                                    {/* Horizontal Line */}
                                     <div className={cn(
-                                        "absolute h-[2.5px] bg-slate-200/40 z-0",
-                                        c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full"
+                                        "absolute h-[1px] bg-white/10 shadow-[0_0_5px_rgba(255,255,255,0.05)] transition-all duration-700 z-0",
+                                        c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
+                                        hovering?.r === r && "bg-white/20 shadow-[0_0_8px_rgba(255,255,255,0.1)]"
                                     )}></div>
 
-                                    {/* Stone */}
+                                    {/* Synapse Nodes (Glowing Intersections) */}
+                                    <div className="absolute w-2 h-2 rounded-full bg-white/5 blur-[1px] z-0" />
+                                    <motion.div
+                                        animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.2, 1] }}
+                                        transition={{ duration: 3, repeat: Infinity, delay: (r + c) * 0.2 }}
+                                        className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/40 blur-[0.5px] z-0 shadow-[0_0_6px_rgba(252,231,213,0.3)]"
+                                    />
+
+                                    {/* Occult Stone (The Soul & Aura System) */}
                                     <AnimatePresence mode="popLayout">
                                         {cell.type !== 'empty' && (
                                             <motion.div
@@ -301,28 +342,36 @@ export function GameBoard({ state, role, onMove, onSwap, onEndTurn, isAiMode }: 
                                                 animate={{ scale: 1, opacity: 1 }}
                                                 exit={{ scale: 0, opacity: 0 }}
                                                 className={cn(
-                                                    "w-[68%] h-[68%] rounded-full z-10 shadow-lg relative transition-all duration-300 border",
-                                                    cell.type === 'black' && "bg-black border-slate-700 shadow-black/80",
-                                                    cell.type === 'white' && "bg-white border-slate-200 shadow-white/20",
-                                                    cell.type === 'resistance' && "bg-yellow-400 border-yellow-300 shadow-yellow-400/20",
-                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-amber-400 ring-offset-2 ring-offset-slate-900"
+                                                    "w-[70%] h-[70%] rounded-full z-10 shadow-2xl relative transition-all duration-500",
+                                                    "border border-white/5 backdrop-blur-sm",
+                                                    cell.type === 'black' && "bg-gradient-to-br from-slate-900 via-black to-slate-950",
+                                                    (cell.type === 'white' || cell.type === 'resistance') && "bg-gradient-to-br from-slate-50 via-white to-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.1)]",
+                                                    // Edge Glows (The Aura)
+                                                    cell.type === 'resistance' && "ring-2 ring-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)]",
+                                                    cell.effects.includes('empathy') && "ring-2 ring-emerald-400/60 shadow-[0_0_20px_rgba(52,211,153,0.4)]",
+                                                    cell.effects.includes('control') && "ring-2 ring-blue-400/60 shadow-[0_0_20px_rgba(96,165,250,0.4)]",
+                                                    cell.effects.includes('aggression') && "ring-2 ring-rose-500/60 shadow-[0_0_20px_rgba(244,63,94,0.4)]",
+                                                    cell.effects.includes('manipulation') && "ring-2 ring-purple-400/60 shadow-[0_0_20px_rgba(192,132,252,0.4)]",
+                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-4 ring-white ring-offset-2 ring-offset-slate-950 scale-110"
                                                 )}
                                             >
-                                                {/* Effect markers - Centered */}
+                                                {/* The Core (The Heart) */}
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                    {cell.effects.includes('empathy') && (
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_green] border border-green-500/50" />
-                                                    )}
-                                                    {cell.effects.includes('control') && !cell.effects.includes('empathy') && (
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_8px_blue] border border-blue-500/50" />
-                                                    )}
-                                                    {cell.effects.includes('aggression') && !cell.effects.includes('empathy') && !cell.effects.includes('control') && (
-                                                        <div className="text-[12px] font-black text-slate-400 tracking-tighter">X</div>
+                                                    {cell.type === 'black' ? (
+                                                        <div className="w-1/3 h-1/3 rounded-full bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent blur-[2px] animate-pulse" />
+                                                    ) : (
+                                                        <Sparkles className="w-1/2 h-1/2 text-white/5 opacity-40 animate-pulse" />
                                                     )}
 
-                                                    {/* Multi-effect composite (Optional: if we want to show multiple dots, but current requirement is centering one) */}
-                                                    {/* For now, prioritizing: Empathy > Control > Action for the primary center marker */}
+                                                    {/* Central highlight for that glittering light look */}
+                                                    <div className={cn(
+                                                        "w-1 h-1 rounded-full blur-[0.5px]",
+                                                        cell.type === 'black' ? "bg-indigo-300/30" : "bg-white shadow-[0_0_4px_white]"
+                                                    )} />
                                                 </div>
+
+                                                {/* Environmental Reflection */}
+                                                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/10 to-transparent pointer-events-none opacity-50" />
                                             </motion.div>
                                         )}
                                     </AnimatePresence>

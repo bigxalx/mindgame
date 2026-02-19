@@ -100,7 +100,7 @@ export default function Home() {
 
   if (!state) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-[#020205] text-slate-50 flex items-center justify-center p-4">
         <GameLobby onHost={handleHost} onJoin={handleJoin} onAiPlay={handleAiPlay} />
       </main>
     );
@@ -111,7 +111,9 @@ export default function Home() {
   const canEndTurn = isMyTurn && state.moveConfirmed && !isPending && state.pendingSwap === undefined;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 flex flex-col items-center justify-start p-4 md:p-8 space-y-6">
+    <main className="min-h-screen bg-[#020205] text-slate-50 flex flex-col items-center justify-start p-4 md:p-8 space-y-6 overflow-hidden relative">
+      {/* Subtle Vignette Overlay */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] z-40" />
       <div className="w-full max-w-md flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-800 shadow-lg">
@@ -120,6 +122,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold tracking-tighter bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
             MIND GAME
           </h1>
+          <p className="text-[10px] text-indigo-400/60 font-black tracking-[0.3em] uppercase mt-[-4px] ml-1">Hypnotic Protocol</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
