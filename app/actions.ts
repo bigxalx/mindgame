@@ -4,6 +4,19 @@ import { createGame, getGame, saveGame } from "@/lib/storage";
 import { GameState, Player, Board, SpecialEffect, AIDifficulty } from "@/types/game";
 import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized } from "@/lib/game";
 
+function checkWin(board: Board): { gameOver: boolean; winner: Player | null } {
+    let resistanceFound = false;
+    for (const row of board) {
+        for (const cell of row) {
+            if (cell.type === 'resistance') resistanceFound = true;
+        }
+    }
+    return {
+        gameOver: !resistanceFound,
+        winner: !resistanceFound ? 'black' : null
+    };
+}
+
 export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const initialInventory = {
@@ -82,6 +95,13 @@ export async function makeMove(gameId: string, r: number, c: number, effect: Spe
         pendingSwap: isManipulation ? { r, c } : undefined,
     };
 
+    // Check if black wins immediately upon capture
+    const winStatus = checkWin(newBoard);
+    if (winStatus.gameOver) {
+        newState.gameOver = true;
+        newState.winner = winStatus.winner;
+    }
+
     await saveGame(gameId, newState);
     return newState;
 }
@@ -118,6 +138,12 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
         pendingSwap: undefined, // Swap done
     };
 
+    const winStatus = checkWin(newBoard);
+    if (winStatus.gameOver) {
+        newState.gameOver = true;
+        newState.winner = winStatus.winner;
+    }
+
     await saveGame(gameId, newState);
     return newState;
 }
@@ -145,21 +171,16 @@ export async function commitTurn(gameId: string) {
     let newBoard = JSON.parse(JSON.stringify(state.board)) as Board;
     const nextPlayer = state.turn === 'black' ? 'white' : 'black';
 
-    // Check for win conditions
-    let resistanceFound = false;
-    for (const row of newBoard) {
-        for (const cell of row) {
-            if (cell.type === 'resistance') resistanceFound = true;
+    const winStatus = checkWin(newBoard);
+
+    // START OF TURN LOGIC (Only if game is NOT over)
+    if (!winStatus.gameOver) {
+        newBoard = spreadEmpathy(newBoard, nextPlayer);
+
+        if (nextPlayer === 'white') {
+            const result = spreadResistance(newBoard);
+            newBoard = result.board;
         }
-    }
-
-    // START OF TURN LOGIC
-    // Spread empathy for the player whose turn it just became
-    newBoard = spreadEmpathy(newBoard, nextPlayer);
-
-    if (nextPlayer === 'white') {
-        const result = spreadResistance(newBoard);
-        newBoard = result.board;
     }
 
     const newState: GameState = {
@@ -169,8 +190,8 @@ export async function commitTurn(gameId: string) {
         moveConfirmed: false,
         pendingSwap: undefined,
         history: [], // Clear history for new turn
-        gameOver: !resistanceFound,
-        winner: !resistanceFound ? 'black' : null,
+        gameOver: winStatus.gameOver,
+        winner: winStatus.winner,
     };
 
     await saveGame(gameId, newState);
