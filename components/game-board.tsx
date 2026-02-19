@@ -164,8 +164,15 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                         targetC = useSecond ? aiPlannedSwap.c2 : aiPlannedSwap.c1;
                         console.log("AI Phase 2: Executing STRATEGIC swap with", targetR, targetC);
                     } else {
-                        // Fallback to random if no plan matches
-                        const neighbors = getNeighbors(r, c, state.boardSize);
+                        // Fallback to random if no plan matches — only valid stone cells
+                        const neighbors = getNeighbors(r, c, state.boardSize)
+                            .filter(n => state.board[n.r][n.c].type !== 'empty' && state.board[n.r][n.c].type !== 'collapse');
+                        if (neighbors.length === 0) {
+                            // No valid swap target — skip swap, just commit
+                            setAiPlannedSwap(null);
+                            setIsProcessing(false);
+                            return;
+                        }
                         const target = neighbors[Math.floor(Math.random() * neighbors.length)];
                         targetR = target.r;
                         targetC = target.c;

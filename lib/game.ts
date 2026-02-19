@@ -456,7 +456,11 @@ const evaluateBoardDeep = (board: Board, size: number): number => {
                 const distToCenter = Math.abs(r - size / 2) + Math.abs(c - size / 2);
                 score -= distToCenter * 3;
             }
-            if (cell.effects.includes('control')) score += 20;
+            if (cell.effects.includes('control')) {
+                // Only award strategic bonus for White's control — Black's control is bad for White
+                const isWhiteControl = cell.type === 'white' || cell.type === 'resistance';
+                score += isWhiteControl ? 20 : -20;
+            }
         }
     }
 

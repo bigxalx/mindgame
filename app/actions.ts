@@ -227,6 +227,13 @@ export async function swapMove(gameId: string, r1: number, c1: number, r2: numbe
     const state = await getGame(gameId);
     if (!state || !state.pendingSwap) return null;
 
+    // Both cells must contain actual stones (not empty/collapse)
+    const cell1 = state.board[r1]?.[c1];
+    const cell2 = state.board[r2]?.[c2];
+    if (!cell1 || !cell2) return null;
+    if (cell1.type === 'empty' || cell1.type === 'collapse') return null;
+    if (cell2.type === 'empty' || cell2.type === 'collapse') return null;
+
     const previousState = { ...state, history: [] };
     const history = [...state.history, previousState];
 
@@ -297,9 +304,10 @@ export async function commitTurn(gameId: string) {
         const allDestroyed: { r: number; c: number; type: StoneType }[] = [];
 
         // 1. Resolve Placement Effects (Aggression)
+        // Only fire aggression for the CURRENT player's stones — opponent stones fired on their own turn.
         for (let r = 0; r < newBoard.length; r++) {
             for (let c = 0; c < newBoard.length; c++) {
-                if (newBoard[r][c].effects.includes('aggression')) {
+                if (newBoard[r][c].effects.includes('aggression') && newBoard[r][c].type === state.turn) {
                     const result = triggerAggression(newBoard, { r, c });
                     newBoard = result.board;
                     allDestroyed.push(...result.destroyed);
