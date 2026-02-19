@@ -174,7 +174,7 @@ export default function Home() {
                   ? "Your turn: Place a stone"
                   : state.pendingSwap
                     ? "⚡ MANIPULATION ACTIVE: SWAP STONES"
-                    : "Aggression Complete: Finalize or Undo"}
+                    : "Action Complete: Finalize or Undo"}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
