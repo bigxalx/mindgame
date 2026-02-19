@@ -8,12 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Brain, Users, Bot } from "lucide-react";
 
-import { AIDifficulty } from "@/types/game";
+import { AIDifficulty, AIBehavior } from "@/types/game";
 
 interface Props {
     onHost: (name: string, size: number) => void;
     onJoin: (name: string, id: string) => void;
-    onAiPlay: (size: number, difficulty: AIDifficulty) => void;
+    onAiPlay: (size: number, difficulty: AIDifficulty, behaviorTree: AIBehavior) => void;
 }
 
 export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
@@ -21,6 +21,7 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
     const [gameId, setGameId] = useState("");
     const [size, setSize] = useState("5");
     const [difficulty, setDifficulty] = useState<AIDifficulty>("medium");
+    const [behaviorTree, setBehaviorTree] = useState<AIBehavior>("default");
 
     return (
         <Card className="w-full max-w-sm bg-[#05050a]/80 backdrop-blur-xl border-slate-800/50 text-slate-50 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-t border-white/5">
@@ -69,12 +70,12 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                    <div className="space-y-2">
-                        <Label className="text-[10px] uppercase tracking-wider text-slate-500">Difficulty</Label>
+                <div className="space-y-2">
+                    <Label className="text-[10px] uppercase tracking-wider text-slate-500">AI Settings</Label>
+                    <div className="grid grid-cols-2 gap-2">
                         <Select value={difficulty} onValueChange={(v: AIDifficulty) => setDifficulty(v)}>
                             <SelectTrigger className="bg-slate-950 border-slate-800 h-10 text-xs">
-                                <SelectValue placeholder="AI Level" />
+                                <SelectValue placeholder="Difficulty" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-900 border-slate-800">
                                 <SelectItem value="easy">Easy</SelectItem>
@@ -84,16 +85,23 @@ export function GameLobby({ onHost, onJoin, onAiPlay }: Props) {
                                 <SelectItem value="impossible">Impossible</SelectItem>
                             </SelectContent>
                         </Select>
+                        <Select value={behaviorTree} onValueChange={(v: AIBehavior) => setBehaviorTree(v)}>
+                            <SelectTrigger className="bg-slate-950 border-slate-800 h-10 text-xs">
+                                <SelectValue placeholder="Behavior" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800">
+                                <SelectItem value="default">Default BT</SelectItem>
+                                <SelectItem value="none">No Behavior</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
-                    <div className="space-y-2 flex flex-col justify-end">
-                        <Button
-                            variant="outline"
-                            className="w-full border-slate-700 hover:bg-slate-800 h-10"
-                            onClick={() => onAiPlay(parseInt(size), difficulty)}
-                        >
-                            <Bot className="w-4 h-4 mr-2" /> Vs AI
-                        </Button>
-                    </div>
+                    <Button
+                        variant="outline"
+                        className="w-full border-slate-700 hover:bg-slate-800 h-10"
+                        onClick={() => onAiPlay(parseInt(size), difficulty, behaviorTree)}
+                    >
+                        <Bot className="w-4 h-4 mr-2" /> Vs AI
+                    </Button>
                 </div>
 
                 <div className="relative py-2">

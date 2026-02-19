@@ -1,7 +1,8 @@
 "use server";
 
 import { createGame, getGame, saveGame } from "@/lib/storage";
-import { GameState, Player, Board, SpecialEffect, AIDifficulty, StoneType, Inventory } from "@/types/game";
+import { GameState, Player, Board, SpecialEffect, AIDifficulty, AIBehavior, StoneType, Inventory } from "@/types/game";
+
 import { createInitialBoard, checkCaptures, triggerAggression, spreadResistance, spreadEmpathy, getNeighbors, isNeutralized, handleResolutionEvent } from "@/lib/game";
 
 // ---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ function checkWin(board: Board, currentPlayer: Player, turnCount: number = 0): {
  * NPC inventory, and turn limit.  `size` is ignored for AI games; the difficulty
  * config determines the board dimensions.
  */
-export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty) {
+export async function hostGame(nickname: string, size: number = 5, isAiGame: boolean = false, difficulty?: AIDifficulty, behaviorTree: AIBehavior = 'default') {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     // Player gets the full standard inventory (no limitations for now)
@@ -144,6 +145,7 @@ export async function hostGame(nickname: string, size: number = 5, isAiGame: boo
         turnCount: 0,
         ...(turnLimit !== undefined && { turnLimit }),
         ...(npcEffectTypes !== undefined && { npcEffectTypes }),
+        behaviorTree: isAiGame ? behaviorTree : undefined,
     };
 
     await createGame(gameId, initialState);

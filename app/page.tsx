@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { GameBoard } from "@/components/game-board";
 import { GameLobby } from "@/components/game-lobby";
-import { GameState, Player, SpecialEffect, AIDifficulty } from "@/types/game";
+import { GameState, Player, SpecialEffect, AIDifficulty, AIBehavior } from "@/types/game";
+
 import { hostGame, joinGame, pollGame, makeMove, swapMove, undoAction, commitTurn } from "@/app/actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -67,8 +68,8 @@ export default function Home() {
     }
   };
 
-  const handleAiPlay = async (size: number, difficulty: AIDifficulty) => {
-    const res = await hostGame("You", size, true, difficulty);
+  const handleAiPlay = async (size: number, difficulty: AIDifficulty, behaviorTree: AIBehavior) => {
+    const res = await hostGame("You", size, true, difficulty, behaviorTree);
     if (!res) return;
 
     setGameId(res.gameId);
@@ -76,7 +77,7 @@ export default function Home() {
     setNickname("You");
     setRole('black');
     setIsAiMode(true);
-    toast.info(`Playing against AI (${difficulty})`);
+    toast.info(`Playing against AI (${difficulty}, behavior: ${behaviorTree})`);
   };
 
   const handleUndo = async () => {

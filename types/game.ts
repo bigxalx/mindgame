@@ -1,6 +1,7 @@
 export type StoneType = 'black' | 'white' | 'resistance' | 'empty' | 'collapse';
 export type SpecialEffect = 'empathy' | 'control' | 'aggression' | 'manipulation';
 export type AIDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'impossible';
+export type AIBehavior = 'none' | 'default';
 
 export interface Cell {
     type: StoneType;
@@ -34,4 +35,5 @@ export interface GameState {
     turnCount: number;
     turnLimit?: number;        // Max full Black turns before white wins (if resistance remains)
     npcEffectTypes?: SpecialEffect[]; // Which effect types the NPC was assigned at game creation
+    behaviorTree?: AIBehavior; // 'none' = minimax only, 'default' = full BT
 }

@@ -1,4 +1,5 @@
 import { Board, Cell, Player, SpecialEffect, StoneType, GameState, AIDifficulty } from "@/types/game";
+import { runBehaviorTree } from "@/lib/ai-behavior";
 
 export const createInitialBoard = (size: number, numResistance: number = 2): Board => {
     const board: Board = [];
@@ -544,6 +545,12 @@ export const getAIDecision = (
     state: GameState,
     difficulty: AIDifficulty
 ): { r: number; c: number; effect: SpecialEffect | null; swap?: { r1: number; c1: number; r2: number; c2: number } } | null => {
+    // If behavior tree is active, run it first — falls through to minimax if null
+    if (!state.behaviorTree || state.behaviorTree === 'default') {
+        const btMove = runBehaviorTree(state);
+        if (btMove) return btMove;
+    }
+
     const { board, turn, inventory, boardSize } = state;
     const size = boardSize;
     const myInventory = inventory[turn];
