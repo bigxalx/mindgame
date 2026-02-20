@@ -368,37 +368,41 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                         { t: '50%', l: '10%', c: 'rgba(251,146,60,0.5)' }, // Orange Left
                         { t: '50%', l: '90%', c: 'rgba(251,146,60,0.5)' }, // Orange Right
                     ].map((hub, i) => (
-                        <motion.div
+                        <div
                             key={`hub-${i}`}
-                            animate={{ opacity: [0.4, 0.9, 0.4], scale: [0.8, 1.2, 0.8] }}
-                            transition={{ duration: 4 + i, repeat: Infinity, ease: "easeInOut" }}
-                            className="absolute w-40 h-40 rounded-full blur-[40px]"
-                            style={{ top: hub.t, left: hub.l, background: hub.c, transform: 'translate(-50%, -50%)' }}
+                            className="absolute w-40 h-40 rounded-full blur-[40px] opacity-60 animate-pulse transition-transform duration-1000"
+                            style={{
+                                top: hub.t,
+                                left: hub.l,
+                                background: hub.c,
+                                transform: 'translate(-50%, -50%) scale(1)',
+                                willChange: 'opacity, transform'
+                            }}
                         />
                     ))}
                 </div>
 
                 {/* 3. Cinematic Cosmic Fog (The Brain Fog) - High Contrast */}
-                <motion.div
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.6, 0.2] }}
-                    transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_30%_30%,rgba(139,92,246,0.5)_0%,transparent_60%)] blur-[100px] z-[2] mix-blend-screen"
+                <div
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_30%_30%,rgba(139,92,246,0.5)_0%,transparent_60%)] blur-[100px] z-[2] mix-blend-screen opacity-40 animate-[pulse_15s_easeInOut_infinite]"
+                    style={{ willChange: 'opacity' }}
                 />
-                <motion.div
-                    animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.5, 0.1] }}
-                    transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_70%_70%,rgba(79,70,229,0.4)_0%,transparent_60%)] blur-[120px] z-[3] mix-blend-screen"
+                <div
+                    className="absolute inset-[-50%] bg-[radial-gradient(circle_at_70%_70%,rgba(79,70,229,0.4)_0%,transparent_60%)] blur-[120px] z-[3] mix-blend-screen opacity-30 animate-[pulse_20s_easeInOut_infinite]"
+                    style={{ willChange: 'opacity' }}
                 />
 
                 {/* 4. Neural Filaments (Energy Lines) - stable positions via useMemo */}
-                <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden opacity-40">
+                <div className="absolute inset-0 z-[4] pointer-events-none overflow-hidden opacity-30">
                     {filamentStyles.map((style, i) => (
-                        <motion.div
+                        <div
                             key={`synapse-${i}`}
-                            animate={{ opacity: [0.1, 0.6, 0.1], scale: [0.95, 1.05, 0.95] }}
-                            transition={{ duration: 10 + i * 2, repeat: Infinity }}
-                            className="absolute bg-gradient-to-r from-transparent via-white/20 to-transparent h-[1px]"
-                            style={style}
+                            className="absolute bg-gradient-to-r from-transparent via-white/10 to-transparent h-[1px] animate-pulse"
+                            style={{
+                                ...style,
+                                animationDuration: `${10 + i * 2}s`,
+                                willChange: 'opacity'
+                            }}
                         />
                     ))}
                 </div>
@@ -472,10 +476,12 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
 
                                             {/* Synapse Nodes (Organic Glowing Intersections) */}
                                             <div className="absolute w-2 h-2 rounded-full bg-white/5 blur-[2px] z-0" />
-                                            <motion.div
-                                                animate={{ opacity: [0.2, 0.5, 0.2], scale: [0.8, 1.2, 0.8] }}
-                                                transition={{ duration: 3, repeat: Infinity, delay: (r + c) * 0.2 }}
-                                                className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/40 blur-[0.5px] z-0"
+                                            <div
+                                                className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/30 blur-[0.5px] z-0 animate-pulse"
+                                                style={{
+                                                    animationDelay: `${(r + c) * 0.1}s`,
+                                                    willChange: 'opacity'
+                                                }}
                                             />
                                         </>
                                     )}
@@ -483,10 +489,8 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                     {/* Collapse Void Effect */}
                                     {cell.type === 'collapse' && (
                                         <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
-                                            <motion.div
-                                                animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
-                                                transition={{ duration: 4, repeat: Infinity }}
-                                                className="w-12 h-12 bg-[radial-gradient(circle,rgba(0,0,0,1)_0%,rgba(20,20,30,0.8)_40%,transparent_70%)] rounded-full blur-sm"
+                                            <div
+                                                className="w-12 h-12 bg-[radial-gradient(circle,rgba(0,0,0,1)_0%,rgba(20,20,30,0.8)_40%,transparent_70%)] rounded-full blur-sm animate-pulse opacity-80"
                                             />
                                             <div className="w-4 h-4 bg-black rounded-full shadow-[0_0_15px_rgba(0,0,0,1)]" />
                                         </div>
@@ -495,23 +499,14 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                     {/* Aftershock Pulse - High Voltage */}
                                     {cell.aftershock && (state.turnCount - cell.aftershock.turnCreated < 2) && (
                                         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                                            <motion.div
-                                                // Electric flicker effect
-                                                animate={{
-                                                    scale: [1, 1.2, 0.9, 1.1, 1],
-                                                    opacity: [0.6, 0.9, 0.5, 0.8, 0.6]
-                                                }}
-                                                transition={{
-                                                    duration: 0.2,
-                                                    repeat: Infinity,
-                                                    repeatType: "reverse"
-                                                }}
+                                            <div
                                                 className={cn(
-                                                    "w-8 h-8 rounded-full blur-[4px] mix-blend-screen",
+                                                    "w-8 h-8 rounded-full blur-[4px] mix-blend-screen animate-pulse opacity-70 transition-all",
                                                     cell.aftershock.type === 'black'
                                                         ? "bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]"
                                                         : "bg-amber-300 shadow-[0_0_15px_rgba(252,211,77,0.8)]"
                                                 )}
+                                                style={{ willChange: 'opacity, transform' }}
                                             />
                                             <div className={cn(
                                                 "w-3 h-3 rounded-full border-2",
@@ -530,20 +525,18 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                             {isCellUnderInfluence(state.board, r, c, 'empathy', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
                                                 ((cell.type === 'empty' && hovering && canMove) ||
                                                     (cell.type !== 'empty' && cell.effects.length === 0 && cell.type !== 'resistance')) && (
-                                                    <motion.div
-                                                        animate={{ scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }}
-                                                        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                                                        className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] border border-white/20"
+                                                    <div
+                                                        className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] border border-white/20 animate-pulse"
+                                                        style={{ willChange: 'opacity' }}
                                                     />
                                                 )
                                             )}
                                             {/* Control Influence (Blue) */}
                                             {isCellUnderInfluence(state.board, r, c, 'control', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
                                                 ((cell.type === 'empty' && hovering && canMove) || cell.type !== 'empty') && (
-                                                    <motion.div
-                                                        animate={{ scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }}
-                                                        transition={{ duration: 1.2, repeat: Infinity, delay: 0.3, ease: "easeInOut" }}
-                                                        className="w-3 h-3 rounded-full bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,1)] border border-white/20"
+                                                    <div
+                                                        className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)] border border-white/20 animate-pulse"
+                                                        style={{ animationDelay: '0.3s', willChange: 'opacity' }}
                                                     />
                                                 )
                                             )}

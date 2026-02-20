@@ -113,8 +113,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#020205] text-slate-50 flex flex-col items-center justify-start p-4 md:p-8 space-y-6 overflow-hidden relative">
-      {/* Subtle Vignette Overlay */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] z-40" />
+      {/* Subtle Vignette Overlay - Moved to backdrop level */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] z-0" />
       <div className="w-full max-w-md flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-800 shadow-lg">
@@ -168,7 +168,7 @@ export default function Home() {
         onRestart={() => window.location.reload()}
       />
 
-      <div className="w-full max-w-md space-y-4">
+      <div className="w-full max-w-md space-y-4 relative z-10">
         {isMyTurn && (
           <div className="space-y-4">
             <div className="bg-blue-600/10 border border-blue-500/20 p-3 rounded-xl text-center">
