@@ -37,4 +37,6 @@ export interface GameState {
     turnLimit?: number;        // Max full Black turns before white wins (if resistance remains)
     npcEffectTypes?: SpecialEffect[]; // Which effect types the NPC was assigned at game creation
     behaviorTree?: AIBehavior; // 'none' = minimax only, 'default' = full BT
+    phase: 'loadout' | 'playing' | 'gameover';
+    loadoutConfirmed: Record<Player, boolean>;
 }

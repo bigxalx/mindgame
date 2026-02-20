@@ -137,8 +137,8 @@ export async function hostGame(nickname: string, size: number = 5, isAiGame: boo
         boardSize,
         moveConfirmed: false,
         inventory: {
-            black: { ...playerInventory },
-            white: { ...npcInventory },
+            black: { aggression: 0, manipulation: 0, control: 0, empathy: 0 },
+            white: isAiGame ? { ...npcInventory } : { aggression: 0, manipulation: 0, control: 0, empathy: 0 },
         },
         isAiGame,
         difficulty,
@@ -146,6 +146,11 @@ export async function hostGame(nickname: string, size: number = 5, isAiGame: boo
         ...(turnLimit !== undefined && { turnLimit }),
         ...(npcEffectTypes !== undefined && { npcEffectTypes }),
         behaviorTree: isAiGame ? behaviorTree : undefined,
+        phase: 'loadout',
+        loadoutConfirmed: {
+            black: false,
+            white: isAiGame ? true : false, // AI is auto-confirmed with its random set
+        },
     };
 
     await createGame(gameId, initialState);
@@ -156,6 +161,23 @@ export async function joinGame(gameId: string, nickname: string) {
     const game = await getGame(gameId);
     if (!game) throw new Error("Game not found");
     return { gameId, state: game };
+}
+
+export async function submitLoadout(gameId: string, player: Player, inventory: Inventory) {
+    const state = await getGame(gameId);
+    if (!state || state.phase !== 'loadout') return null;
+
+    const newState = { ...state };
+    newState.inventory = { ...state.inventory, [player]: inventory };
+    newState.loadoutConfirmed = { ...state.loadoutConfirmed, [player]: true };
+
+    // If both players confirmed, start the game
+    if (newState.loadoutConfirmed.black && newState.loadoutConfirmed.white) {
+        newState.phase = 'playing';
+    }
+
+    await saveGame(gameId, newState);
+    return newState;
 }
 
 export async function makeMove(gameId: string, r: number, c: number, effect: SpecialEffect | null) {

@@ -5,11 +5,12 @@ import { GameBoard } from "@/components/game-board";
 import { GameLobby } from "@/components/game-lobby";
 import { GameState, Player, SpecialEffect, AIDifficulty, AIBehavior } from "@/types/game";
 
-import { hostGame, joinGame, pollGame, makeMove, swapMove, undoAction, commitTurn } from "@/app/actions";
+import { hostGame, joinGame, pollGame, makeMove, swapMove, undoAction, commitTurn, submitLoadout } from "@/app/actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { RotateCcw, CheckCircle2 } from "lucide-react";
+import { RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
+import { StoneLoadout } from "@/components/stone-loadout";
 
 export default function Home() {
   const [nickname, setNickname] = useState("");
@@ -17,6 +18,7 @@ export default function Home() {
   const [state, setState] = useState<GameState | null>(null);
   const [role, setRole] = useState<Player | 'spectator' | null>(null);
   const [isAiMode, setIsAiMode] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
   // Check for gameId in URL on mount
@@ -149,48 +151,104 @@ export default function Home() {
         </div>
       </div>
 
-      <GameBoard
-        state={state}
-        role={role}
-        onMove={async (r: number, c: number, effect: SpecialEffect | null) => {
-          if (!gameId) return;
-          const newState = await makeMove(gameId, r, c, effect);
-          if (newState) setState(newState);
-        }}
-        onSwap={async (r1: number, c1: number, r2: number, c2: number) => {
-          if (!gameId) return;
-          const newState = await swapMove(gameId, r1, c1, r2, c2);
-          if (newState) setState(newState);
-        }}
-        onUndo={handleUndo}
-        onConfirm={handleEndTurn}
-        onActionTypeChange={() => { }} // Not currently used in page.tsx layout but required by props
-        onRestart={() => window.location.reload()}
-      />
+      {/* Refactored Header Row */}
+      <div className="w-full max-w-4xl flex flex-col md:flex-row items-center justify-between gap-4 px-4 py-2 bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/5 relative z-20">
+        <div className="flex items-center gap-6">
+          <div className="space-y-0.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Current Turn</p>
+            <p className={`text-sm font-black ${state.turn === 'black' ? 'text-slate-100' : 'text-slate-400'}`}>
+              {state.turn === 'black' ? 'BLACK' : 'WHITE'}
+            </p>
+          </div>
+          <div className="w-px h-8 bg-white/5 hidden md:block" />
+          <div className="space-y-0.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black text-right md:text-left">Goal</p>
+            <p className="text-sm font-bold">Neutralize <span className="text-yellow-400">Resistance</span></p>
+          </div>
+        </div>
 
-      <div className="w-full max-w-md space-y-4 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-none">Identity: <span className="text-slate-200">{role || state.turn}</span></p>
+          </div>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="px-3 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            Rules
+          </button>
+        </div>
+      </div>
+
+      {state.phase === 'loadout' ? (
+        <div className="w-full flex flex-col items-center gap-6">
+          <StoneLoadout
+            limit={(state.isAiGame && (state.difficulty === 'easy' || state.difficulty === 'medium')) ? 3 : 5}
+            onConfirm={async (inventory) => {
+              if (!gameId || !role || role === 'spectator') return;
+              const newState = await submitLoadout(gameId, role, inventory);
+              if (newState) setState(newState);
+            }}
+          />
+          {!state.loadoutConfirmed[role as Player] && (
+            <p className="text-xs text-slate-500 animate-pulse">Waiting for your selection...</p>
+          )}
+          {state.loadoutConfirmed[role as Player] && !state.loadoutConfirmed[role === 'black' ? 'white' : 'black'] && (
+            <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl text-center space-y-3">
+              <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-white animate-spin mx-auto" />
+              <p className="text-sm font-medium text-slate-300">Synchronizing with opponent...</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Protocol initialization in progress</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <GameBoard
+          state={state}
+          role={role}
+          onMove={async (r: number, c: number, effect: SpecialEffect | null) => {
+            if (!gameId) return;
+            const newState = await makeMove(gameId, r, c, effect);
+            if (newState) setState(newState);
+          }}
+          onSwap={async (r1: number, c1: number, r2: number, c2: number) => {
+            if (!gameId) return;
+            const newState = await swapMove(gameId, r1, c1, r2, c2);
+            if (newState) setState(newState);
+          }}
+          onUndo={handleUndo}
+          onConfirm={handleEndTurn}
+          onActionTypeChange={() => { }}
+          onRestart={() => window.location.reload()}
+          showHelp={showHelp}
+          setShowHelp={setShowHelp}
+        />
+      )}
+
+      {/* Simplified Bottom Controls */}
+      <div className="w-full max-w-2xl flex flex-col items-center gap-4 relative z-10 pb-8">
         {isMyTurn && (
-          <div className="space-y-4">
-            <div className="bg-blue-600/10 border border-blue-500/20 p-3 rounded-xl text-center">
-              <p className="text-sm font-medium text-blue-300 italic">
+          <div className="w-full space-y-4">
+            <div className="text-center">
+              <p className="text-xs font-black text-blue-400 uppercase tracking-[0.3em] bg-blue-500/5 py-2 rounded-full border border-blue-500/10">
                 {!state.moveConfirmed
                   ? "Your turn: Place a stone"
                   : state.pendingSwap
-                    ? "⚡ MANIPULATION ACTIVE: SWAP STONES"
-                    : "Action Complete: Finalize or Undo"}
+                    ? "⚡ SWAP ACTIVE"
+                    : "Finalize Turn"}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <Button
                 variant="outline"
-                className="border-slate-800 bg-slate-900/50 hover:bg-slate-800 h-12 w-full"
+                className="border-white/5 bg-slate-900/40 hover:bg-slate-800 h-14 rounded-2xl font-black uppercase tracking-widest text-xs"
                 disabled={!canUndo}
                 onClick={handleUndo}
               >
                 <RotateCcw className="w-4 h-4 mr-2" /> Undo
               </Button>
               <Button
-                className="bg-blue-600 hover:bg-blue-500 h-12 w-full shadow-lg shadow-blue-900/20"
+                className="bg-blue-600 hover:bg-blue-500 h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl shadow-blue-900/40"
                 disabled={!canEndTurn}
                 onClick={handleEndTurn}
               >
@@ -199,21 +257,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
-        <Card className="p-4 bg-slate-900/50 border-slate-800 backdrop-blur-md">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Current Turn</p>
-              <p className={`text-lg font-bold ${state.turn === 'black' ? 'text-slate-100' : 'text-slate-400'}`}>
-                {state.turn === 'black' ? 'BLACK' : 'WHITE'}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">Goal</p>
-              <p className="text-sm">Neutralize <span className="text-yellow-400 font-bold">Resistance</span></p>
-            </div>
-          </div>
-        </Card>
       </div>
     </main>
   );

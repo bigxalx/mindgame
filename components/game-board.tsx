@@ -17,6 +17,8 @@ interface Props {
     onSwap: (r1: number, c1: number, r2: number, c2: number) => void;
     onActionTypeChange: (type: 'move' | 'swap') => void;
     onRestart: () => void;
+    showHelp: boolean;
+    setShowHelp: (show: boolean) => void;
 }
 
 // Helper to check influence for dots
@@ -42,13 +44,12 @@ function isCellUnderInfluence(board: Board, r: number, c: number, effect: string
     return false;
 }
 
-export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onActionTypeChange, onRestart }: Props) {
+export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onActionTypeChange, onRestart, showHelp, setShowHelp }: Props) {
     const [selectedEffect, setSelectedEffect] = useState<SpecialEffect | null>(null);
     const [hovering, setHovering] = useState<{ r: number; c: number } | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [swapSelection, setSwapSelection] = useState<{ r: number; c: number } | null>(null);
     const [aiPlannedSwap, setAiPlannedSwap] = useState<{ r1: number; c1: number; r2: number; c2: number } | null>(null);
-    const [showHelp, setShowHelp] = useState(false);
     const [helpTab, setHelpTab] = useState<'goal' | 'empathy' | 'control' | 'aggression' | 'manipulation'>('goal');
 
     // Stable filament positions — computed once to avoid hydration mismatch
@@ -250,108 +251,59 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
     const effectColor = selectedEffect ? effectsList.find(e => e.id === selectedEffect)?.color.replace('text-', 'bg-') : 'bg-blue-500';
 
     return (
-        <div className="flex flex-col items-center space-y-8 w-full">
-            {/* Special Stones Selector */}
-            <div className="w-full max-w-md space-y-3">
-                <div className="flex justify-between items-center mb-1 px-1">
-                    <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Stones</p>
-                    <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-slate-400 font-medium">Player: <span className="uppercase text-slate-200">{role || state.turn}</span></p>
-                        <button
-                            onClick={() => { setShowHelp(true); setHelpTab('goal'); }}
-                            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-400/70 hover:text-amber-300 transition-all duration-200 group"
-                            title="Rules & Help"
-                        >
-                            <HelpCircle className="w-4 h-4 shrink-0" />
-                            <span className="text-[10px] font-semibold tracking-wide uppercase">Rules</span>
-                        </button>
-                    </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                    {effectsList.map((eff) => {
-                        const count = currentInventory[eff.id] || 0;
-                        const isAvailable = count > 0;
-                        return (
-                            <button
-                                key={eff.id}
-                                onClick={() => setSelectedEffect(selectedEffect === eff.id ? null : eff.id)}
-                                disabled={!canMove || !isAvailable}
-                                className={cn(
-                                    "relative flex flex-col items-center justify-center p-2 pt-3 rounded-xl border transition-all duration-200",
-                                    selectedEffect === eff.id
-                                        ? "bg-slate-800 border-slate-600 ring-2 ring-blue-500/50 translate-y-[-2px]"
-                                        : "bg-slate-900 border-slate-800 hover:bg-slate-800 disabled:opacity-30"
-                                )}
-                            >
-                                <span className="absolute top-1 right-2 text-[9px] font-black text-slate-500">{count}x</span>
-                                <eff.icon className={cn("w-5 h-5 mb-1", eff.color)} />
-                                <span className="text-[10px] font-medium text-slate-400">{eff.label}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Effect Description */}
-                <AnimatePresence mode="wait">
-                    {selectedEffect && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="bg-slate-900/40 p-3 rounded-lg border border-slate-800 text-center"
-                        >
-                            <p className="text-xs text-slate-300 italic">
-                                {effectsList.find(e => e.id === selectedEffect)?.desc}
-                            </p>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Turn Limit Countdown (AI games only) */}
-            {state.turnLimit !== undefined && !state.gameOver && (
-                (() => {
-                    const blackTurnsDone = Math.ceil(state.turnCount / 2); // full black turns done so far
-                    const remaining = state.turnLimit - blackTurnsDone;
-                    const urgency = remaining <= 3 ? 'red' : remaining <= 6 ? 'amber' : 'blue';
-                    const pct = Math.max(0, remaining / state.turnLimit) * 100;
-                    return (
-                        <div className="w-full max-w-md space-y-1">
-                            <div className="flex justify-between items-center px-1">
-                                <p className="text-xs uppercase tracking-widest text-slate-500 font-bold">Turns Remaining</p>
-                                <p className={cn(
-                                    "text-sm font-black tabular-nums",
-                                    urgency === 'red' && "text-red-400 animate-pulse",
-                                    urgency === 'amber' && "text-amber-400",
-                                    urgency === 'blue' && "text-slate-300",
-                                )}>{remaining} / {state.turnLimit}</p>
-                            </div>
-                            <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                                <div
-                                    className={cn(
-                                        "h-full rounded-full transition-all duration-700",
-                                        urgency === 'red' && "bg-red-500",
-                                        urgency === 'amber' && "bg-amber-400",
-                                        urgency === 'blue' && "bg-blue-500",
-                                    )}
-                                    style={{ width: `${pct}%` }}
-                                />
-                            </div>
-                        </div>
-                    );
-                })()
-            )}
+        <div className="flex flex-col items-center w-full">
 
             {/* Board Wrapper (Hypnotic Neural Synapse Background) */}
             <div
-                className="relative rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden group border border-white/5"
+                className="relative rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden border border-white/5 flex flex-col"
                 style={{
-                    width: 'min(95vw, 750px)',
-                    height: 'min(95vw, 750px)',
-                    padding: '8%',
+                    width: 'min(98vw, 800px)',
+                    height: 'min(140vw, 1100px)',
+                    padding: '24px',
                     backgroundColor: '#020205',
                 }}
             >
+                {/* 1. Base Image - Subtile, Deep Space */}
+                <div
+                    className="absolute inset-0 z-0 opacity-100 bg-center bg-no-repeat bg-cover"
+                    style={{ backgroundImage: 'url(/synapse_bg.png)' }}
+                />
+
+                {/* Top Overlay: Turns Remaining */}
+                <div className="relative z-20 w-full mb-4 px-6 pt-4">
+                    {state.turnLimit !== undefined && !state.gameOver && (
+                        (() => {
+                            const blackTurnsDone = Math.ceil(state.turnCount / 2);
+                            const remaining = state.turnLimit - blackTurnsDone;
+                            const urgency = remaining <= 3 ? 'red' : remaining <= 6 ? 'amber' : 'blue';
+                            const pct = Math.max(0, remaining / state.turnLimit) * 100;
+                            return (
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">Turns Remaining</p>
+                                        <p className={cn(
+                                            "text-sm font-black tabular-nums",
+                                            urgency === 'red' && "text-red-400",
+                                            urgency === 'amber' && "text-amber-400",
+                                            urgency === 'blue' && "text-slate-100",
+                                        )}>{remaining} / {state.turnLimit}</p>
+                                    </div>
+                                    <div className="w-full h-1 rounded-full bg-white/5 overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                "h-full transition-all duration-700",
+                                                urgency === 'red' && "bg-red-500",
+                                                urgency === 'amber' && "bg-amber-400",
+                                                urgency === 'blue' && "bg-blue-500",
+                                            )}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })()
+                    )}
+                </div>
                 {/* 1. Base Image - Subtile, Deep Space */}
                 <div
                     className="absolute inset-0 z-0 opacity-100 bg-center bg-no-repeat bg-cover"
@@ -410,218 +362,272 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                 {/* 5. Vignette / Depth */}
                 <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.85)_100%)] z-[5] pointer-events-none" />
 
-                {/* The Interactive Board (Centered Grid) */}
-                <div className="relative w-full h-full z-10">
+                {/* The Interactive Board (Centered Square Content) */}
+                <div className="relative flex-1 flex flex-col items-center justify-center z-10">
+                    <div className="w-full max-w-full aspect-square relative">
 
-                    {/* Glow Effects Layer */}
-                    <AnimatePresence>
-                        {hovering && state.board[hovering.r][hovering.c].type === 'empty' && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 pointer-events-none z-0"
-                                style={{
-                                    background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(139, 92, 246, 0.12) 0%, transparent 25%)`
-                                }}
-                            />
-                        )}
-                        {/* Action Preview Glows */}
-                        {affectedCells.map((cell, idx) => (
-                            <motion.div
-                                key={`affected-${idx}`}
-                                initial={{ opacity: 0, scale: 0.5 }}
-                                animate={{ opacity: 0.6, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.5 }}
-                                className={cn("absolute pointer-events-none rounded-full blur-2xl z-0", effectColor || "bg-blue-400")}
-                                style={{
-                                    width: `${100 / state.boardSize}%`,
-                                    height: `${100 / state.boardSize}%`,
-                                    left: `${(cell.c / state.boardSize) * 100}%`,
-                                    top: `${(cell.r / state.boardSize) * 100}%`,
-                                    transform: 'scale(1.5)', // Larger glow for preview
-                                }}
-                            />
-                        ))}
-                    </AnimatePresence>
+                        {/* Glow Effects Layer */}
+                        <AnimatePresence>
+                            {hovering && state.board[hovering.r][hovering.c].type === 'empty' && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute inset-0 pointer-events-none z-0"
+                                    style={{
+                                        background: `radial-gradient(circle at ${((hovering.c + 0.5) / state.boardSize) * 100}% ${((hovering.r + 0.5) / state.boardSize) * 100}%, rgba(139, 92, 246, 0.12) 0%, transparent 25%)`
+                                    }}
+                                />
+                            )}
+                            {/* Action Preview Glows */}
+                            {affectedCells.map((cell, idx) => (
+                                <motion.div
+                                    key={`affected-${idx}`}
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 0.6, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5 }}
+                                    className={cn("absolute pointer-events-none rounded-full blur-2xl z-0", effectColor || "bg-blue-400")}
+                                    style={{
+                                        width: `${100 / state.boardSize}%`,
+                                        height: `${100 / state.boardSize}%`,
+                                        left: `${(cell.c / state.boardSize) * 100}%`,
+                                        top: `${(cell.r / state.boardSize) * 100}%`,
+                                        transform: 'scale(1.5)', // Larger glow for preview
+                                    }}
+                                />
+                            ))}
+                        </AnimatePresence>
 
-                    {/* The Grid */}
-                    <div
-                        className="grid h-full w-full shadow-2xl"
-                        style={{
-                            gridTemplateColumns: `repeat(${state.boardSize}, 1fr)`,
-                            gridTemplateRows: `repeat(${state.boardSize}, 1fr)`,
-                        }}
-                    >
-                        {state.board.map((row: Cell[], r: number) =>
-                            row.map((cell: Cell, c: number) => (
-                                <div
-                                    key={cell.id}
-                                    className="relative flex items-center justify-center group touch-none"
-                                    onClick={() => handleClick(r, c)}
-                                    onMouseEnter={() => setHovering({ r, c })}
-                                    onMouseLeave={() => setHovering(null)}
-                                >
-                                    {/* High-Glow Organic Filaments (Grid Lines) */}
-                                    {cell.type !== 'collapse' && (
-                                        <>
-                                            <div className={cn(
-                                                "absolute w-[2px] bg-white/20 transition-all duration-700 z-0",
-                                                r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
-                                            )}></div>
-                                            <div className={cn(
-                                                "absolute h-[2px] bg-white/20 transition-all duration-700 z-0",
-                                                c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
-                                            )}></div>
+                        {/* The Grid */}
+                        <div
+                            className="grid h-full w-full shadow-2xl"
+                            style={{
+                                gridTemplateColumns: `repeat(${state.boardSize}, 1fr)`,
+                                gridTemplateRows: `repeat(${state.boardSize}, 1fr)`,
+                            }}
+                        >
+                            {state.board.map((row: Cell[], r: number) =>
+                                row.map((cell: Cell, c: number) => (
+                                    <div
+                                        key={cell.id}
+                                        className="relative aspect-square flex items-center justify-center group touch-none"
+                                        onClick={() => handleClick(r, c)}
+                                        onMouseEnter={() => setHovering({ r, c })}
+                                        onMouseLeave={() => setHovering(null)}
+                                    >
+                                        {/* High-Glow Organic Filaments (Grid Lines) */}
+                                        {cell.type !== 'collapse' && (
+                                            <>
+                                                <div className={cn(
+                                                    "absolute w-[3px] bg-white/10 transition-all duration-700 z-0",
+                                                    r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
+                                                )}></div>
+                                                <div className={cn(
+                                                    "absolute h-[3px] bg-white/10 transition-all duration-700 z-0",
+                                                    c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
+                                                )}></div>
 
-                                            {/* Synapse Nodes (Organic Glowing Intersections) */}
-                                            <div className="absolute w-2 h-2 rounded-full bg-white/5 blur-[2px] z-0" />
-                                            <div
-                                                className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/30 blur-[0.5px] z-0 animate-pulse"
-                                                style={{
-                                                    animationDelay: `${(r + c) * 0.1}s`,
-                                                    willChange: 'opacity'
-                                                }}
-                                            />
-                                        </>
-                                    )}
-
-                                    {/* Collapse Void Effect */}
-                                    {cell.type === 'collapse' && (
-                                        <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
-                                            <div
-                                                className="w-12 h-12 bg-[radial-gradient(circle,rgba(0,0,0,1)_0%,rgba(20,20,30,0.8)_40%,transparent_70%)] rounded-full blur-sm animate-pulse opacity-80"
-                                            />
-                                            <div className="w-4 h-4 bg-black rounded-full shadow-[0_0_15px_rgba(0,0,0,1)]" />
-                                        </div>
-                                    )}
-
-                                    {/* Aftershock Pulse - High Voltage */}
-                                    {cell.aftershock && (state.turnCount - cell.aftershock.turnCreated < 2) && (
-                                        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                                            <div
-                                                className={cn(
-                                                    "w-8 h-8 rounded-full blur-[4px] mix-blend-screen animate-pulse opacity-70 transition-all",
-                                                    cell.aftershock.type === 'black'
-                                                        ? "bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]"
-                                                        : "bg-amber-300 shadow-[0_0_15px_rgba(252,211,77,0.8)]"
-                                                )}
-                                                style={{ willChange: 'opacity, transform' }}
-                                            />
-                                            <div className={cn(
-                                                "w-3 h-3 rounded-full border-2",
-                                                cell.aftershock.type === 'black'
-                                                    ? "bg-black border-cyan-400"
-                                                    : "bg-white border-amber-400"
-                                            )} />
-                                        </div>
-                                    )}
-
-                                    {/* Cognitive Influence Markers (Centered Dots) */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
-                                        <div className="flex gap-2">
-                                            {/* Empathy Influence (Green) */}
-                                            {/* Show on grid ONLY during placement; show on stones ONLY if neutral */}
-                                            {isCellUnderInfluence(state.board, r, c, 'empathy', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
-                                                ((cell.type === 'empty' && hovering && canMove) ||
-                                                    (cell.type !== 'empty' && cell.effects.length === 0 && cell.type !== 'resistance')) && (
-                                                    <div
-                                                        className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] border border-white/20 animate-pulse"
-                                                        style={{ willChange: 'opacity' }}
-                                                    />
-                                                )
-                                            )}
-                                            {/* Control Influence (Blue) */}
-                                            {isCellUnderInfluence(state.board, r, c, 'control', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
-                                                ((cell.type === 'empty' && hovering && canMove) || cell.type !== 'empty') && (
-                                                    <div
-                                                        className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)] border border-white/20 animate-pulse"
-                                                        style={{ animationDelay: '0.3s', willChange: 'opacity' }}
-                                                    />
-                                                )
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Occult Stone (The Soul & Aura System) */}
-                                    <AnimatePresence mode="popLayout">
-                                        {cell.type !== 'empty' && (
-                                            <motion.div
-                                                layoutId={cell.id}
-                                                initial={{ scale: 0, opacity: 0 }}
-                                                animate={{ scale: 1, opacity: 1 }}
-                                                exit={{ scale: 0, opacity: 0 }}
-                                                className={cn(
-                                                    "w-[62%] h-[62%] rounded-full z-10 shadow-2xl relative transition-all duration-500",
-                                                    "border border-white/10 backdrop-blur-md overflow-hidden",
-                                                    cell.type === 'black' && "bg-black",
-                                                    cell.type === 'white' && "bg-white",
-                                                    cell.type === 'resistance' && "bg-yellow-400 border-none shadow-[0_0_20px_rgba(250,204,21,0.4)]",
-                                                    // Interior Aura Rings (50% Mass) - Updated for Neutralization
-                                                    cell.effects.includes('empathy') && (
-                                                        isNeutralized(state.board, r, c)
-                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-emerald-500/40" : "ring-[14px] ring-inset ring-emerald-500/70")
-                                                    ),
-                                                    cell.effects.includes('control') && (
-                                                        isNeutralized(state.board, r, c)
-                                                            ? "ring-[10px] ring-inset ring-blue-500/20 opacity-60 blur-[1px]"
-                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-blue-500/40" : "ring-[14px] ring-inset ring-blue-500/70")
-                                                    ),
-                                                    cell.effects.includes('aggression') && (
-                                                        isNeutralized(state.board, r, c)
-                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-rose-500/40" : "ring-[14px] ring-inset ring-rose-500/70")
-                                                    ),
-                                                    cell.effects.includes('manipulation') && (
-                                                        isNeutralized(state.board, r, c)
-                                                            ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
-                                                            : (cell.type === 'black' ? "ring-[10px] ring-inset ring-purple-500/40" : "ring-[14px] ring-inset ring-purple-500/70")
-                                                    ),
-                                                    swapSelection?.r === r && swapSelection?.c === c && "ring-[4px] ring-white scale-110 shadow-[0_0_30px_rgba(255,255,255,0.8)]"
-                                                )}
-                                            >
-                                                {/* Specialized Light Hearts */}
-                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                                                    {cell.type === 'black' ? (
-                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-purple-500/40 via-indigo-600/20 to-transparent blur-[4px] animate-pulse" />
-                                                    ) : cell.type === 'resistance' ? (
-                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-yellow-100/40 to-transparent blur-[4px] animate-pulse" />
-                                                    ) : (
-                                                        <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-blue-100/40 to-transparent blur-[3px] animate-pulse" />
-                                                    )}
-
-                                                    {/* The Concentrated Light Spark */}
-                                                    <div className={cn(
-                                                        "w-1.5 h-1.5 rounded-full blur-[0.3px] shadow-[0_0_10px_rgba(255,255,255,0.8)]",
-                                                        cell.type === 'black' ? "bg-purple-200" : "bg-white"
-                                                    )} />
-                                                </div>
-
-                                                {/* Depth Insets */}
-                                                <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.1),inset_0_-2px_10px_rgba(0,0,0,0.5)] z-10" />
-
-                                                {/* Environmental Polished Sheen */}
-                                                <div className="absolute inset-[-2px] bottom-1/2 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none z-30" />
-                                            </motion.div>
+                                                {/* Synapse Nodes (Organic Glowing Intersections) */}
+                                                <div className="absolute w-3 h-3 rounded-full bg-white/4 blur-[2px] z-0" />
+                                                <div
+                                                    className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/30 blur-[0.5px] z-0 animate-pulse"
+                                                    style={{
+                                                        animationDelay: `${(r + c) * 0.1}s`,
+                                                        willChange: 'opacity'
+                                                    }}
+                                                />
+                                            </>
                                         )}
-                                    </AnimatePresence>
 
-                                    {/* Highlight valid swap targets */}
-                                    {isSwapMode && !swapSelection && cell.type !== 'empty' && state.pendingSwap && Math.abs(r - state.pendingSwap.r) + Math.abs(c - state.pendingSwap.c) <= 1 && (
-                                        <div className="absolute inset-0 bg-amber-400/10 animate-pulse z-0" />
-                                    )}
+                                        {/* Collapse Void Effect */}
+                                        {cell.type === 'collapse' && (
+                                            <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+                                                <div
+                                                    className="w-12 h-12 bg-[radial-gradient(circle,rgba(0,0,0,1)_0%,rgba(20,20,30,0.8)_40%,transparent_70%)] rounded-full blur-sm animate-pulse opacity-80"
+                                                />
+                                                <div className="w-4 h-4 bg-black rounded-full shadow-[0_0_15px_rgba(0,0,0,1)]" />
+                                            </div>
+                                        )}
 
-                                    {/* Preview on hover */}
-                                    {hovering?.r === r && hovering?.c === c && cell.type === 'empty' && canMove && (
-                                        <div className={cn(
-                                            "w-[65%] h-[65%] rounded-full border-2 border-dashed opacity-40 animate-pulse",
-                                            state.turn === 'black' ? "border-slate-50" : "border-slate-400"
+                                        {/* Aftershock Pulse - High Voltage */}
+                                        {cell.aftershock && (state.turnCount - cell.aftershock.turnCreated < 2) && (
+                                            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                                                <div
+                                                    className={cn(
+                                                        "w-8 h-8 rounded-full blur-[4px] mix-blend-screen animate-pulse opacity-70 transition-all",
+                                                        cell.aftershock.type === 'black'
+                                                            ? "bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]"
+                                                            : "bg-amber-300 shadow-[0_0_15px_rgba(252,211,77,0.8)]"
+                                                    )}
+                                                    style={{ willChange: 'opacity, transform' }}
+                                                />
+                                                <div className={cn(
+                                                    "w-3 h-3 rounded-full border-2",
+                                                    cell.aftershock.type === 'black'
+                                                        ? "bg-black border-cyan-400"
+                                                        : "bg-white border-amber-400"
+                                                )} />
+                                            </div>
+                                        )}
+
+                                        {/* Cognitive Influence Markers (Centered Dots) */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                                            <div className="flex gap-2">
+                                                {/* Empathy Influence (Green) */}
+                                                {/* Show on grid ONLY during placement; show on stones ONLY if neutral */}
+                                                {isCellUnderInfluence(state.board, r, c, 'empathy', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
+                                                    ((cell.type === 'empty' && hovering && canMove) ||
+                                                        (cell.type !== 'empty' && cell.effects.length === 0 && cell.type !== 'resistance')) && (
+                                                        <div
+                                                            className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] border border-white/20 animate-pulse"
+                                                            style={{ willChange: 'opacity' }}
+                                                        />
+                                                    )
+                                                )}
+                                                {/* Control Influence (Blue) */}
+                                                {isCellUnderInfluence(state.board, r, c, 'control', (hovering && canMove) ? { ...hovering, effect: selectedEffect } : undefined) && (
+                                                    ((cell.type === 'empty' && hovering && canMove) || cell.type !== 'empty') && (
+                                                        <div
+                                                            className="w-2.5 h-2.5 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)] border border-white/20 animate-pulse"
+                                                            style={{ animationDelay: '0.3s', willChange: 'opacity' }}
+                                                        />
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Occult Stone (The Soul & Aura System) */}
+                                        <AnimatePresence mode="popLayout">
+                                            {cell.type !== 'empty' && (
+                                                <motion.div
+                                                    layoutId={cell.id}
+                                                    initial={{ scale: 0, opacity: 0 }}
+                                                    animate={{ scale: 1, opacity: 1 }}
+                                                    exit={{ scale: 0, opacity: 0 }}
+                                                    className={cn(
+                                                        "w-[62%] aspect-square rounded-full z-10 shadow-2xl relative transition-all duration-500",
+                                                        "border border-white/10 backdrop-blur-md overflow-hidden",
+                                                        cell.type === 'black' && "bg-black",
+                                                        cell.type === 'white' && "bg-white",
+                                                        cell.type === 'resistance' && "bg-yellow-400 border-none shadow-[0_0_20px_rgba(250,204,21,0.4)]",
+                                                        // Interior Aura Rings (50% Mass) - Updated for Neutralization
+                                                        cell.effects.includes('empathy') && (
+                                                            isNeutralized(state.board, r, c)
+                                                                ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                                : (cell.type === 'black' ? "ring-[10px] ring-inset ring-emerald-500/40" : "ring-[14px] ring-inset ring-emerald-500/70")
+                                                        ),
+                                                        cell.effects.includes('control') && (
+                                                            isNeutralized(state.board, r, c)
+                                                                ? "ring-[10px] ring-inset ring-blue-500/20 opacity-60 blur-[1px]"
+                                                                : (cell.type === 'black' ? "ring-[10px] ring-inset ring-blue-500/40" : "ring-[14px] ring-inset ring-blue-500/70")
+                                                        ),
+                                                        cell.effects.includes('aggression') && (
+                                                            isNeutralized(state.board, r, c)
+                                                                ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                                : (cell.type === 'black' ? "ring-[10px] ring-inset ring-rose-500/40" : "ring-[14px] ring-inset ring-rose-500/70")
+                                                        ),
+                                                        cell.effects.includes('manipulation') && (
+                                                            isNeutralized(state.board, r, c)
+                                                                ? "ring-[10px] ring-inset ring-slate-500/20 grayscale opacity-40 blur-[1px]"
+                                                                : (cell.type === 'black' ? "ring-[10px] ring-inset ring-purple-500/40" : "ring-[14px] ring-inset ring-purple-500/70")
+                                                        ),
+                                                        swapSelection?.r === r && swapSelection?.c === c && "ring-[4px] ring-white scale-110 shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+                                                    )}
+                                                >
+                                                    {/* Specialized Light Hearts */}
+                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                                                        {cell.type === 'black' ? (
+                                                            <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-purple-500/40 via-indigo-600/20 to-transparent blur-[4px] animate-pulse" />
+                                                        ) : cell.type === 'resistance' ? (
+                                                            <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-yellow-100/40 to-transparent blur-[4px] animate-pulse" />
+                                                        ) : (
+                                                            <div className="w-1/2 h-1/2 rounded-full bg-gradient-to-br from-white via-blue-100/40 to-transparent blur-[3px] animate-pulse" />
+                                                        )}
+
+                                                        {/* The Concentrated Light Spark */}
+                                                        <div className={cn(
+                                                            "w-1.5 h-1.5 rounded-full blur-[0.3px] shadow-[0_0_10px_rgba(255,255,255,0.8)]",
+                                                            cell.type === 'black' ? "bg-purple-200" : "bg-white"
+                                                        )} />
+                                                    </div>
+
+                                                    {/* Depth Insets */}
+                                                    <div className="absolute inset-0 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.1),inset_0_-2px_10px_rgba(0,0,0,0.5)] z-10" />
+
+                                                    {/* Environmental Polished Sheen */}
+                                                    <div className="absolute inset-[-2px] bottom-1/2 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none z-30" />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        {/* Highlight valid swap targets */}
+                                        {isSwapMode && !swapSelection && cell.type !== 'empty' && state.pendingSwap && Math.abs(r - state.pendingSwap.r) + Math.abs(c - state.pendingSwap.c) <= 1 && (
+                                            <div className="absolute inset-0 bg-amber-400/10 animate-pulse z-0" />
+                                        )}
+
+                                        {/* Preview on hover */}
+                                        {hovering?.r === r && hovering?.c === c && cell.type === 'empty' && canMove && (
+                                            <div className={cn(
+                                                "w-[65%] h-[65%] rounded-full border-2 border-dashed opacity-40 animate-pulse",
+                                                state.turn === 'black' ? "border-slate-50" : "border-slate-400"
+                                            )} />
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom Overlay: Stones Inventory */}
+                <div className="relative z-20 w-full mt-auto pt-4 px-2 pb-2">
+                    <div className="bg-black/40 backdrop-blur-md border border-white/5 rounded-2xl p-4 shadow-2xl">
+                        <div className="flex justify-between items-center mb-3">
+                            <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-black">Stones</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{role || state.turn}</p>
+                        </div>
+                        <div className="grid grid-cols-4 gap-3">
+                            {effectsList.map((eff) => {
+                                const count = currentInventory[eff.id] || 0;
+                                const isAvailable = count > 0;
+                                return (
+                                    <button
+                                        key={eff.id}
+                                        onClick={() => setSelectedEffect(selectedEffect === eff.id ? null : eff.id)}
+                                        disabled={!canMove || !isAvailable}
+                                        className={cn(
+                                            "relative flex flex-col items-center justify-center py-2 rounded-xl border transition-all duration-200 group",
+                                            selectedEffect === eff.id
+                                                ? "bg-slate-50 border-white text-slate-950 shadow-[0_0_20px_rgba(255,255,255,0.3)] ring-1 ring-white/50"
+                                                : "bg-white/5 border-white/10 hover:bg-white/10 disabled:opacity-20"
+                                        )}
+                                    >
+                                        <div className="absolute -top-1.5 -right-1 flex items-center justify-center w-5 h-5 rounded-full bg-slate-900 border border-white/20 text-[9px] font-black text-white shadow-lg">
+                                            {count}x
+                                        </div>
+                                        <eff.icon className={cn(
+                                            "w-5 h-5 mb-1 transition-transform group-hover:scale-110",
+                                            selectedEffect === eff.id ? "text-slate-950" : eff.color
                                         )} />
-                                    )}
-                                </div>
-                            ))
-                        )}
+                                        <span className={cn(
+                                            "text-[9px] font-bold uppercase tracking-tighter",
+                                            selectedEffect === eff.id ? "text-slate-900" : "text-slate-400"
+                                        )}>{eff.label}</span>
+
+                                        {/* Simplified Hover Desc for Mobile-first layout */}
+                                        <div className={cn(
+                                            "absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 pointer-events-none transition-all duration-300",
+                                            "opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0",
+                                            selectedEffect === eff.id && "opacity-100 translate-y-0"
+                                        )}>
+                                            <div className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-[10px] text-slate-300 shadow-2xl text-center leading-tight">
+                                                {eff.desc}
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -642,18 +648,18 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.92, y: 16 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+                            className="bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden"
                         >
                             {/* Header */}
-                            <div className="flex items-center justify-between px-6 pt-6 pb-3">
-                                <h2 className="text-lg font-black tracking-tighter text-white uppercase italic">Rules</h2>
+                            <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                                <h2 className="text-2xl font-black tracking-tighter text-white uppercase italic">Rules & Strategy</h2>
                                 <button onClick={() => setShowHelp(false)} className="text-slate-500 hover:text-white transition-colors">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* Tabs */}
-                            <div className="flex gap-1 px-4 pb-2 overflow-x-auto">
+                            <div className="flex gap-2 px-6 pb-4 overflow-x-auto">
                                 {([
                                     { id: 'goal', label: 'Goal', icon: Swords, color: 'text-slate-300' },
                                     { id: 'empathy', label: 'Empathy', icon: Heart, color: 'text-green-400' },
@@ -665,108 +671,113 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                         key={tab.id}
                                         onClick={() => setHelpTab(tab.id)}
                                         className={cn(
-                                            "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all",
+                                            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap transition-all",
                                             helpTab === tab.id
-                                                ? "bg-slate-800 text-white"
-                                                : "text-slate-500 hover:text-slate-300"
+                                                ? "bg-slate-800 text-white shadow-lg"
+                                                : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                                         )}
                                     >
-                                        <tab.icon className={cn("w-3 h-3", helpTab === tab.id ? tab.color : '')} />
+                                        <tab.icon className={cn("w-4 h-4", helpTab === tab.id ? tab.color : '')} />
                                         {tab.label}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Tab Content */}
-                            <div className="px-6 pb-6 pt-2 min-h-[200px]">
+                            <div className="px-8 pb-8 pt-4 min-h-[300px]">
                                 <AnimatePresence mode="wait">
                                     {helpTab === 'goal' && (
-                                        <motion.div key="goal" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
-                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Objective</p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                You play as <span className="font-bold text-white">Black</span>. Your goal is to capture all
+                                        <motion.div key="goal" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-4">
+                                            <p className="text-sm font-bold uppercase tracking-widest text-slate-500">Objective</p>
+                                            <p className="text-xl text-slate-200 leading-relaxed font-medium">
+                                                You play as <span className="font-bold text-white underline decoration-blue-500/50 underline-offset-8">Black</span>. Your goal is to capture all
                                                 {' '}<span className="font-bold text-yellow-400">Resistance stones</span> before the turn limit expires.
                                             </p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                            <p className="text-lg text-slate-400 leading-relaxed">
                                                 Capture works like Go: surround an enemy group on all sides with no empty neighbours (no liberties) and it is destroyed.
                                             </p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
+                                            <p className="text-lg text-slate-400 leading-relaxed">
                                                 If the turn limit runs out and any Resistance stones remain, <span className="font-bold text-white">White wins</span>.
                                             </p>
-                                            <div className="mt-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">
-                                                    <span className="font-bold text-amber-400">Aftershock</span> — when stones are captured, a pulsing residue remains for one round cycle. The losing team cannot immediately reclaim that cell.
+                                            <div className="mt-4 p-5 rounded-2xl bg-slate-800/40 border border-slate-701/50">
+                                                <p className="text-base text-slate-400">
+                                                    <span className="font-bold text-amber-400 uppercase text-xs tracking-widest block mb-2">Aftershock Pattern</span>
+                                                    When stones are captured, a pulsing residue remains for one round cycle. The losing team cannot immediately reclaim that cell.
                                                 </p>
                                             </div>
-                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">
-                                                    <span className="font-bold text-slate-200">Collapse</span> — if 4 or more stones are destroyed in a single event, the geometric centre of the destroyed group becomes a permanent void. Nothing can be placed there.
+                                            <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-701/50">
+                                                <p className="text-base text-slate-400">
+                                                    <span className="font-bold text-slate-200 uppercase text-xs tracking-widest block mb-2">Collapse Phenomenon</span>
+                                                    If 4 or more stones are destroyed in a single event, the geometric centre of the destroyed group becomes a permanent void.
                                                 </p>
                                             </div>
                                         </motion.div>
                                     )}
                                     {helpTab === 'empathy' && (
-                                        <motion.div key="empathy" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Heart className="w-5 h-5 text-green-400" />
-                                                <p className="text-xs font-bold uppercase tracking-widest text-green-400">Empathy</p>
+                                        <motion.div key="empathy" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <Heart className="w-8 h-8 text-green-400" />
+                                                <p className="text-base font-bold uppercase tracking-widest text-green-400">Empathy Protocol</p>
                                             </div>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                At the <strong>start of its owner's turn</strong>, an Empathy stone converts all adjacent <em>neutral</em> (no-effect) opponent stones to its colour — and each converted stone also becomes an Empathy stone, spreading the effect virally.
+                                            <p className="text-xl text-slate-200 leading-relaxed">
+                                                At the <strong>start of its owner's turn</strong>, an Empathy stone converts all adjacent <em>neutral</em> opponent stones to its colour.
                                             </p>
-                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">Growth is <span className="font-bold text-slate-300">blocked</span> if the Empathy stone is neutralised by an adjacent enemy Control stone.</p>
+                                            <p className="text-lg text-slate-400 leading-relaxed">
+                                                Each converted stone also becomes an Empathy stone, spreading the effect virally across the board.
+                                            </p>
+                                            <div className="p-5 rounded-2xl bg-green-500/5 border border-green-500/10">
+                                                <p className="text-base text-slate-400 italic">Growth is blocked if the stone is neutralized by an adjacent enemy Control stone.</p>
                                             </div>
                                         </motion.div>
                                     )}
                                     {helpTab === 'control' && (
-                                        <motion.div key="control" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Shield className="w-5 h-5 text-blue-400" />
-                                                <p className="text-xs font-bold uppercase tracking-widest text-blue-400">Control</p>
+                                        <motion.div key="control" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <Shield className="w-8 h-8 text-blue-400" />
+                                                <p className="text-base font-bold uppercase tracking-widest text-blue-400">Control Firewall</p>
                                             </div>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                An active Control stone <strong>suppresses</strong> all adjacent opponent stones, blocking their special effects (Empathy growth, Resistance spread).
+                                            <p className="text-xl text-slate-200 leading-relaxed">
+                                                An active Control stone <strong>suppresses</strong> all adjacent opponent stones, blocking their special effects.
                                             </p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                Two opposing Control stones that are adjacent <strong>neutralise each other</strong> — both become inactive.
+                                            <p className="text-lg text-slate-400 leading-relaxed">
+                                                Two opposing Control stones that are adjacent <strong>neutralize each other</strong> — both become inactive grey shells.
                                             </p>
-                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">A neutralised stone appears greyed-out and no longer exerts its effect.</p>
+                                            <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/10">
+                                                <p className="text-base text-slate-400 italic">A neutralized stone appears greyed-out and no longer exerts its effect.</p>
                                             </div>
                                         </motion.div>
                                     )}
                                     {helpTab === 'aggression' && (
-                                        <motion.div key="aggression" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Target className="w-5 h-5 text-red-400" />
-                                                <p className="text-xs font-bold uppercase tracking-widest text-red-400">Aggression</p>
+                                        <motion.div key="aggression" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <Target className="w-8 h-8 text-red-400" />
+                                                <p className="text-base font-bold uppercase tracking-widest text-red-400">Aggression Beam</p>
                                             </div>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                Place two Aggression stones in the <strong>same row or column</strong> with no empty gaps between them. All stones between the two are immediately destroyed.
+                                            <p className="text-xl text-slate-200 leading-relaxed">
+                                                Align two Aggression stones in the <strong>same row or column</strong> with no empty gaps between them.
                                             </p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                The beam stops at empty cells or Collapse voids — it will not fire through gaps.
+                                            <p className="text-lg text-slate-400 leading-relaxed">
+                                                All stones trapped between the two are immediately destroyed. The beam stops at empty cells or voids.
                                             </p>
-                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">The destroyed stones still trigger <span className="font-bold text-amber-400">Aftershock</span> and can cause a <span className="font-bold text-slate-200">Collapse</span> if 4+ are destroyed.</p>
+                                            <div className="p-5 rounded-2xl bg-red-500/5 border border-red-500/10">
+                                                <p className="text-base text-slate-400 italic">Destroyed stones still trigger Aftershocks and can cause Collapses.</p>
                                             </div>
                                         </motion.div>
                                     )}
                                     {helpTab === 'manipulation' && (
-                                        <motion.div key="manipulation" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Zap className="w-5 h-5 text-purple-400" />
-                                                <p className="text-xs font-bold uppercase tracking-widest text-purple-400">Manipulation</p>
+                                        <motion.div key="manipulation" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <Zap className="w-8 h-8 text-purple-400" />
+                                                <p className="text-base font-bold uppercase tracking-widest text-purple-400">Neural Manipulation</p>
                                             </div>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                After placing a Manipulation stone, you choose <strong>two adjacent stones</strong> (both must be neighbours of the Manipulation stone) to swap positions.
+                                            <p className="text-xl text-slate-200 leading-relaxed">
+                                                Choose <strong>two adjacent stones</strong> that are neighbours of the Manipulation stone to swap positions.
                                             </p>
-                                            <p className="text-sm text-slate-200 leading-relaxed">
-                                                Both <strong>stone types and special effects</strong> move together as a single unit. If a special stone (like Aggression) is moved, its ability <strong>re-triggers</strong> at the new position. The Manipulation effect is consumed after use.
+                                            <p className="text-lg text-slate-400 leading-relaxed">
+                                                Stone types and effects move as one unit. Any special stone moved will <strong>re-trigger</strong> its logic from the new position.
                                             </p>
-                                            <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
-                                                <p className="text-[11px] text-slate-400">Captures and spreading are re-evaluated after the swap.</p>
+                                            <div className="p-5 rounded-2xl bg-purple-500/5 border border-purple-500/10">
+                                                <p className="text-base text-slate-400 italic">Captures and spreading are re-evaluated after the swap.</p>
                                             </div>
                                         </motion.div>
                                     )}
