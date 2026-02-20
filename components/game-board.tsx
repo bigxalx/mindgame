@@ -419,11 +419,11 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                         {cell.type !== 'collapse' && (
                                             <>
                                                 <div className={cn(
-                                                    "absolute w-[3px] bg-white/10 transition-all duration-700 z-0",
+                                                    "absolute w-[3px] bg-white/10 transition-opacity duration-700 z-0",
                                                     r === 0 ? "top-1/2 h-1/2" : r === state.boardSize - 1 ? "bottom-1/2 h-1/2" : "h-full",
                                                 )}></div>
                                                 <div className={cn(
-                                                    "absolute h-[3px] bg-white/10 transition-all duration-700 z-0",
+                                                    "absolute h-[3px] bg-white/10 transition-opacity duration-700 z-0",
                                                     c === 0 ? "left-1/2 w-1/2" : c === state.boardSize - 1 ? "right-1/2 w-1/2" : "w-full",
                                                 )}></div>
 
@@ -433,7 +433,6 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                                     className="absolute w-1 h-1 rounded-full bg-[#fce7d5]/30 blur-[0.5px] z-0 animate-pulse"
                                                     style={{
                                                         animationDelay: `${(r + c) * 0.1}s`,
-                                                        willChange: 'opacity'
                                                     }}
                                                 />
                                             </>
@@ -505,8 +504,8 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                                     animate={{ scale: 1, opacity: 1 }}
                                                     exit={{ scale: 0, opacity: 0 }}
                                                     className={cn(
-                                                        "w-[62%] aspect-square rounded-full z-10 shadow-2xl relative transition-all duration-500",
-                                                        "border border-white/10 backdrop-blur-md overflow-hidden",
+                                                        "w-[62%] aspect-square rounded-full z-10 shadow-2xl relative transition-opacity transition-transform duration-500",
+                                                        "border border-white/10 overflow-hidden",
                                                         cell.type === 'black' && "bg-black",
                                                         cell.type === 'white' && "bg-white",
                                                         cell.type === 'resistance' && "bg-yellow-400 border-none shadow-[0_0_20px_rgba(250,204,21,0.4)]",
@@ -596,7 +595,7 @@ export function GameBoard({ state, role, onMove, onUndo, onConfirm, onSwap, onAc
                                         onClick={() => setSelectedEffect(selectedEffect === eff.id ? null : eff.id)}
                                         disabled={!canMove || !isAvailable}
                                         className={cn(
-                                            "relative flex flex-col items-center justify-center py-2 rounded-xl border transition-all duration-200 group",
+                                            "relative flex flex-col items-center justify-center py-2 rounded-xl border transition-opacity transition-transform duration-200 group",
                                             selectedEffect === eff.id
                                                 ? "bg-slate-50 border-white text-slate-950 shadow-[0_0_20px_rgba(255,255,255,0.3)] ring-1 ring-white/50"
                                                 : "bg-white/5 border-white/10 hover:bg-white/10 disabled:opacity-20"

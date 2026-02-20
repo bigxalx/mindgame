@@ -71,7 +71,7 @@ export function StoneLoadout({ limit, onConfirm }: Props) {
                             onClick={() => handlePick(eff.id)}
                             disabled={!isAvailable}
                             className={cn(
-                                "group relative flex flex-col items-center p-4 rounded-2xl border transition-all duration-300",
+                                "group relative flex flex-col items-center p-4 rounded-2xl border transition-opacity transition-transform duration-300",
                                 isAvailable
                                     ? "bg-slate-800/40 border-slate-700/50 hover:bg-slate-800 hover:border-slate-500 hover:scale-[1.02]"
                                     : "bg-slate-950/40 border-slate-900/50 opacity-40 cursor-not-allowed"
